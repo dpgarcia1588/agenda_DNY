@@ -194,8 +194,10 @@ export default function App() {
       };
       let error;
       if (form.id) {
+        registro.modificado_por = sesion.user?.email || null;
         ({ error } = await supabase.from("eventos").update(registro).eq("id", form.id));
       } else {
+        registro.creado_por = sesion.user?.email || null;
         ({ error } = await supabase.from("eventos").insert(registro));
       }
       if (error) throw error;
@@ -477,6 +479,12 @@ export default function App() {
                     <label style={s.label}>Notas</label>
                     <textarea style={{ ...s.input, minHeight: 60, resize: "vertical" }} value={form.notas || ""} onChange={(e) => setForm({ ...form, notas: e.target.value })} placeholder="Menú, colores, detalles…" />
                   </div>
+                  {form.id && (form.creado_por || form.modificado_por) && (
+                    <div style={{ fontSize: 12, color: C.muted, background: "#FDFBF7", border: `1px solid ${C.line}`, borderRadius: 8, padding: "8px 12px" }}>
+                      {form.creado_por && <div>Registrado por: <strong>{form.creado_por}</strong></div>}
+                      {form.modificado_por && <div>Última modificación por: <strong>{form.modificado_por}</strong></div>}
+                    </div>
+                  )}
                   {confirmando ? (
                     <div style={{ background: "#FBF3E2", border: `1px solid ${C.goldSoft}`, borderLeft: `4px solid ${C.gold}`, borderRadius: 10, padding: "14px 16px" }}>
                       <div style={{ fontWeight: 700, color: C.wine, fontSize: 15, marginBottom: 6 }}>
@@ -521,7 +529,10 @@ export default function App() {
                           </div>
                           <div style={{ fontSize: 13, color: C.wineSoft, marginTop: 2 }}>{ev.tipo}{ev.invitados ? ` · ${ev.invitados} invitados` : ""}</div>
                           {ev.lugar && <div style={{ fontSize: 13, color: C.muted, marginTop: 2 }}>{ev.lugar}</div>}
-                          <div style={{ fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.05em", color: ev.estado === "Confirmado" ? C.free : C.gold, marginTop: 6 }}>{ev.estado}</div>
+                          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8, flexWrap: "wrap", marginTop: 6 }}>
+                            <span style={{ fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.05em", color: ev.estado === "Confirmado" ? C.free : C.gold }}>{ev.estado}</span>
+                            {ev.creado_por && <span style={{ fontSize: 11, color: C.muted }}>Registrado por {ev.creado_por}</span>}
+                          </div>
                         </button>
                       ))}
                     </div>
