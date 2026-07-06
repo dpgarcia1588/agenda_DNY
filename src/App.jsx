@@ -38,6 +38,36 @@ export default function App() {
   const [semanaOffset, setSemanaOffset] = useState(0);
   const [errorMsg, setErrorMsg] = useState("");
 
+  // ————— Sesión (inicio de sesión requerido) —————
+  const [sesion, setSesion] = useState(null);
+  const [sesionLista, setSesionLista] = useState(false);
+  const [loginEmail, setLoginEmail] = useState("");
+  const [loginPass, setLoginPass] = useState("");
+  const [loginError, setLoginError] = useState("");
+  const [entrando, setEntrando] = useState(false);
+
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data }) => {
+      setSesion(data.session);
+      setSesionLista(true);
+    });
+    const { data: sub } = supabase.auth.onAuthStateChange((_ev, s) => setSesion(s));
+    return () => sub.subscription.unsubscribe();
+  }, []);
+
+  const iniciarSesion = async () => {
+    setEntrando(true);
+    setLoginError("");
+    const { error } = await supabase.auth.signInWithPassword({ email: loginEmail.trim(), password: loginPass });
+    if (error) setLoginError("Correo o contraseña incorrectos.");
+    setEntrando(false);
+  };
+
+  const cerrarSesion = async () => {
+    await supabase.auth.signOut();
+    setEventos({});
+  };
+
   const configurado = SUPABASE_URL.startsWith("https://") && SUPABASE_ANON_KEY.length > 20;
 
   // ————— Cargar datos desde Supabase —————
@@ -61,6 +91,8 @@ export default function App() {
   };
 
   useEffect(() => {
+    if (!sesion) { setCargando(false); return; }
+    setCargando(true);
     cargarEventos();
     if (!configurado) return;
     // Sincronización en tiempo real: si alguien más registra/edita, se actualiza solo
@@ -74,7 +106,7 @@ export default function App() {
       supabase.removeChannel(canal);
       document.removeEventListener("visibilitychange", alVolver);
     };
-  }, []);
+  }, [sesion]);
 
   // ————— Calendario —————
   const celdas = useMemo(() => {
@@ -240,18 +272,59 @@ export default function App() {
     );
   }
 
+  // ————— Pantalla de inicio de sesión —————
+  if (!sesionLista) {
+    return <div style={{ minHeight: "100vh", background: C.bg, display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "'Karla', sans-serif", color: C.muted }}>Cargando…</div>;
+  }
+
+  if (!sesion) {
+    return (
+      <div style={{ minHeight: "100vh", background: C.bg, fontFamily: "'Karla', sans-serif", color: C.ink, display: "flex", alignItems: "center", justifyContent: "center", padding: 20 }}>
+        <div style={{ background: C.card, border: `1px solid ${C.line}`, borderRadius: 16, padding: "32px 28px", maxWidth: 400, width: "100%", boxShadow: "0 4px 20px rgba(92,31,46,0.08)" }}>
+          <h1 style={{ fontFamily: "'Fraunces', serif", fontSize: 28, margin: 0, fontWeight: 700, color: C.ink, textAlign: "center" }}>
+            DNY Party Decoration
+          </h1>
+          <div style={{ fontFamily: "'Fraunces', serif", fontSize: 16, color: C.wineSoft, marginTop: 4, textAlign: "center", borderBottom: `2px solid ${C.wine}`, paddingBottom: 16 }}>Agenda de eventos</div>
+
+          <div style={{ marginTop: 24, display: "grid", gap: 14 }}>
+            <div>
+              <label style={s.label}>Correo</label>
+              <input style={s.input} type="email" value={loginEmail} onChange={(e) => setLoginEmail(e.target.value)} placeholder="tu@correo.com" autoComplete="username" />
+            </div>
+            <div>
+              <label style={s.label}>Contraseña</label>
+              <input style={s.input} type="password" value={loginPass} onChange={(e) => setLoginPass(e.target.value)} placeholder="········" autoComplete="current-password"
+                onKeyDown={(e) => { if (e.key === "Enter") iniciarSesion(); }} />
+            </div>
+            {loginError && <div style={{ color: "#A33", fontSize: 14, fontWeight: 600 }}>{loginError}</div>}
+            <button style={{ ...s.btnPrim, opacity: entrando || !loginEmail || !loginPass ? 0.6 : 1 }} onClick={iniciarSesion} disabled={entrando || !loginEmail || !loginPass}>
+              {entrando ? "Entrando…" : "Iniciar sesión"}
+            </button>
+            <p style={{ fontSize: 13, color: C.muted, textAlign: "center", margin: 0 }}>Acceso solo para el equipo de DNY. Si necesitas una cuenta, pídesela al administrador.</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div style={{ minHeight: "100vh", background: C.bg, fontFamily: "'Karla', sans-serif", color: C.ink }}>
       <div style={{ maxWidth: 980, margin: "0 auto", padding: "24px 16px 64px" }}>
 
         {/* Cabecera */}
-        <header style={{ marginBottom: 24, borderBottom: `2px solid ${C.wine}`, paddingBottom: 16 }}>
-          <h1 style={{ fontFamily: "'Fraunces', serif", fontSize: "clamp(28px, 5vw, 40px)", margin: 0, fontWeight: 700, color: C.ink }}>
-            DNY Party Decoration
-          </h1>
-          <div style={{ fontFamily: "'Fraunces', serif", fontSize: 18, color: C.wineSoft, marginTop: 6 }}>Agenda de eventos</div>
-          {guardando && <div style={{ fontSize: 12, color: C.muted, marginTop: 4 }}>Guardando…</div>}
-          {errorMsg && <div style={{ fontSize: 13, color: "#A33", marginTop: 6, fontWeight: 600 }}>{errorMsg}</div>}
+        <header style={{ marginBottom: 24, borderBottom: `2px solid ${C.wine}`, paddingBottom: 16, display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 12, flexWrap: "wrap" }}>
+          <div>
+            <h1 style={{ fontFamily: "'Fraunces', serif", fontSize: "clamp(28px, 5vw, 40px)", margin: 0, fontWeight: 700, color: C.ink }}>
+              DNY Party Decoration
+            </h1>
+            <div style={{ fontFamily: "'Fraunces', serif", fontSize: 18, color: C.wineSoft, marginTop: 6 }}>Agenda de eventos</div>
+            {guardando && <div style={{ fontSize: 12, color: C.muted, marginTop: 4 }}>Guardando…</div>}
+            {errorMsg && <div style={{ fontSize: 13, color: "#A33", marginTop: 6, fontWeight: 600 }}>{errorMsg}</div>}
+          </div>
+          <div style={{ textAlign: "right" }}>
+            <div style={{ fontSize: 12, color: C.muted, marginBottom: 6 }}>{sesion.user?.email}</div>
+            <button onClick={cerrarSesion} style={{ ...s.btnGhost, padding: "6px 14px", fontSize: 13 }}>Cerrar sesión</button>
+          </div>
         </header>
 
         {/* ————— Buscador de clientes ————— */}
