@@ -1,0 +1,542 @@
+import { useState, useEffect, useMemo } from "react";
+import { createClient } from "@supabase/supabase-js";
+import { SUPABASE_URL, SUPABASE_ANON_KEY } from "./config.js";
+
+const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+// ————— Paleta "Banquete" —————
+const C = {
+  bg: "#F7F3EC",
+  card: "#FFFFFF",
+  ink: "#2B1B22",
+  wine: "#5C1F2E",
+  wineSoft: "#7A3242",
+  gold: "#B8892E",
+  goldSoft: "#E7D3A8",
+  line: "#E7DFD3",
+  free: "#3E7A55",
+  muted: "#8C7F72",
+};
+
+const MESES = ["Enero","Febrero","Marzo","Abril","Mayo","Junio","Julio","Agosto","Septiembre","Octubre","Noviembre","Diciembre"];
+const DIAS = ["Lun","Mar","Mié","Jue","Vie","Sáb","Dom"];
+const TIPOS = ["Decoración", "Catering", "Decoración + Catering"];
+
+const pad = (n) => String(n).padStart(2, "0");
+const keyOf = (d) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+
+export default function App() {
+  const hoy = new Date();
+  const [vista, setVista] = useState(new Date(hoy.getFullYear(), hoy.getMonth(), 1));
+  const [eventos, setEventos] = useState({}); // { "2026-07-04": [evento, ...] }
+  const [diaSel, setDiaSel] = useState(keyOf(hoy));
+  const [cargando, setCargando] = useState(true);
+  const [form, setForm] = useState(null);
+  const [guardando, setGuardando] = useState(false);
+  const [confirmando, setConfirmando] = useState(false);
+  const [busqueda, setBusqueda] = useState("");
+  const [semanaOffset, setSemanaOffset] = useState(0);
+  const [errorMsg, setErrorMsg] = useState("");
+
+  const configurado = SUPABASE_URL.startsWith("https://") && SUPABASE_ANON_KEY.length > 20;
+
+  // ————— Cargar datos desde Supabase —————
+  const cargarEventos = async () => {
+    if (!configurado) { setCargando(false); return; }
+    try {
+      const { data, error } = await supabase.from("eventos").select("*").order("hora", { ascending: true });
+      if (error) throw error;
+      const agrupados = {};
+      for (const ev of data || []) {
+        if (!agrupados[ev.fecha]) agrupados[ev.fecha] = [];
+        agrupados[ev.fecha].push(ev);
+      }
+      setEventos(agrupados);
+      setErrorMsg("");
+    } catch (e) {
+      console.error(e);
+      setErrorMsg("No se pudieron cargar los eventos. Revisa tu conexión o la configuración de Supabase.");
+    }
+    setCargando(false);
+  };
+
+  useEffect(() => {
+    cargarEventos();
+    if (!configurado) return;
+    // Sincronización en tiempo real: si alguien más registra/edita, se actualiza solo
+    const canal = supabase
+      .channel("eventos-cambios")
+      .on("postgres_changes", { event: "*", schema: "public", table: "eventos" }, () => cargarEventos())
+      .subscribe();
+    const alVolver = () => { if (document.visibilityState === "visible") cargarEventos(); };
+    document.addEventListener("visibilitychange", alVolver);
+    return () => {
+      supabase.removeChannel(canal);
+      document.removeEventListener("visibilitychange", alVolver);
+    };
+  }, []);
+
+  // ————— Calendario —————
+  const celdas = useMemo(() => {
+    const y = vista.getFullYear(), m = vista.getMonth();
+    const primero = new Date(y, m, 1);
+    const offset = (primero.getDay() + 6) % 7; // Lunes = 0
+    const diasMes = new Date(y, m + 1, 0).getDate();
+    const arr = [];
+    for (let i = 0; i < offset; i++) arr.push(null);
+    for (let d = 1; d <= diasMes; d++) arr.push(new Date(y, m, d));
+    return arr;
+  }, [vista]);
+
+  const evsDia = eventos[diaSel] || [];
+
+  const proximos = useMemo(() => {
+    const hoyK = keyOf(new Date());
+    return Object.entries(eventos)
+      .filter(([k, list]) => k >= hoyK && list.length)
+      .sort(([a], [b]) => a.localeCompare(b))
+      .slice(0, 5);
+  }, [eventos]);
+
+  // ————— Semana (lunes a domingo) —————
+  const diasSemana = useMemo(() => {
+    const base = new Date();
+    base.setHours(0, 0, 0, 0);
+    const lunes = new Date(base);
+    lunes.setDate(base.getDate() - ((base.getDay() + 6) % 7) + semanaOffset * 7);
+    return Array.from({ length: 7 }, (_, i) => {
+      const d = new Date(lunes);
+      d.setDate(lunes.getDate() + i);
+      return d;
+    });
+  }, [semanaOffset]);
+
+  const totalSemana = useMemo(
+    () => diasSemana.reduce((acc, d) => acc + (eventos[keyOf(d)] || []).length, 0),
+    [diasSemana, eventos]
+  );
+
+  // ————— Búsqueda por cliente —————
+  const normalizar = (t) => t.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+  const resultados = useMemo(() => {
+    const q = normalizar(busqueda.trim());
+    if (!q) return [];
+    const out = [];
+    for (const [k, list] of Object.entries(eventos)) {
+      for (const ev of list) {
+        if (normalizar(ev.cliente || "").includes(q)) out.push({ fecha: k, ev });
+      }
+    }
+    out.sort((a, b) => a.fecha.localeCompare(b.fecha));
+    return out;
+  }, [busqueda, eventos]);
+
+  // ————— Acciones —————
+  const abrirNuevo = () => { setConfirmando(false); setForm({ id: null, cliente: "", tipo: TIPOS[2], hora: "", lugar: "", invitados: "", notas: "", estado: "Pendiente" }); };
+  const abrirEditar = (ev) => { setConfirmando(false); setForm({ ...ev }); };
+
+  const intentarGuardar = () => {
+    if (!form.cliente.trim()) return;
+    const existentes = eventos[diaSel] || [];
+    if (!form.id && existentes.length > 0) {
+      setConfirmando(true);
+    } else {
+      guardarEvento();
+    }
+  };
+
+  const guardarEvento = async () => {
+    if (!form.cliente.trim()) return;
+    setConfirmando(false);
+    setGuardando(true);
+    try {
+      const registro = {
+        fecha: diaSel,
+        cliente: form.cliente.trim(),
+        tipo: form.tipo,
+        hora: form.hora || null,
+        lugar: form.lugar || null,
+        invitados: form.invitados ? Number(form.invitados) : null,
+        notas: form.notas || null,
+        estado: form.estado,
+      };
+      let error;
+      if (form.id) {
+        ({ error } = await supabase.from("eventos").update(registro).eq("id", form.id));
+      } else {
+        ({ error } = await supabase.from("eventos").insert(registro));
+      }
+      if (error) throw error;
+      await cargarEventos();
+      setForm(null);
+      setErrorMsg("");
+    } catch (e) {
+      console.error(e);
+      setErrorMsg("No se pudo guardar el evento. Intenta de nuevo.");
+    }
+    setGuardando(false);
+  };
+
+  const eliminarEvento = async (id) => {
+    setGuardando(true);
+    try {
+      const { error } = await supabase.from("eventos").delete().eq("id", id);
+      if (error) throw error;
+      await cargarEventos();
+      setForm(null);
+      setErrorMsg("");
+    } catch (e) {
+      console.error(e);
+      setErrorMsg("No se pudo eliminar el evento. Intenta de nuevo.");
+    }
+    setGuardando(false);
+  };
+
+  const cambiarMes = (delta) => setVista(new Date(vista.getFullYear(), vista.getMonth() + delta, 1));
+
+  const irADia = (k) => {
+    setDiaSel(k);
+    setForm(null);
+    setConfirmando(false);
+    const [y, m] = k.split("-").map(Number);
+    setVista(new Date(y, m - 1, 1));
+  };
+
+  const abrirResultado = (k, ev) => {
+    setDiaSel(k);
+    setConfirmando(false);
+    setForm({ ...ev });
+    const [y, m] = k.split("-").map(Number);
+    setVista(new Date(y, m - 1, 1));
+    setBusqueda("");
+  };
+
+  const fmtFecha = (k) => {
+    const [y, m, d] = k.split("-").map(Number);
+    const f = new Date(y, m - 1, d);
+    return `${DIAS[(f.getDay() + 6) % 7]} ${d} de ${MESES[m - 1]}`;
+  };
+
+  // ————— Estilos base —————
+  const s = {
+    input: { width: "100%", padding: "10px 12px", border: `1px solid ${C.line}`, borderRadius: 8, fontSize: 15, fontFamily: "inherit", color: C.ink, background: "#FDFCFA", boxSizing: "border-box", outline: "none" },
+    label: { fontSize: 12, letterSpacing: "0.06em", textTransform: "uppercase", color: C.muted, marginBottom: 4, display: "block", fontWeight: 600 },
+    btnPrim: { background: C.wine, color: "#fff", border: "none", padding: "12px 20px", borderRadius: 8, fontSize: 15, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" },
+    btnGhost: { background: "transparent", color: C.wine, border: `1px solid ${C.line}`, padding: "12px 20px", borderRadius: 8, fontSize: 15, cursor: "pointer", fontFamily: "inherit" },
+  };
+
+  const ocupacion = (n) => (n === 0 ? { txt: "Día libre", col: C.free } : n === 1 ? { txt: "1 evento", col: C.gold } : { txt: `${n} eventos`, col: C.wine });
+
+  // ————— Pantalla de configuración pendiente —————
+  if (!configurado) {
+    return (
+      <div style={{ minHeight: "100vh", background: C.bg, fontFamily: "'Karla', sans-serif", color: C.ink, display: "flex", alignItems: "center", justifyContent: "center", padding: 20 }}>
+        <div style={{ background: C.card, border: `1px solid ${C.line}`, borderRadius: 14, padding: 28, maxWidth: 520 }}>
+          <h1 style={{ fontFamily: "'Fraunces', serif", color: C.wine, fontSize: 26, marginTop: 0 }}>Falta configurar Supabase</h1>
+          <p>Abre el archivo <code style={{ background: "#FBF3E2", padding: "2px 6px", borderRadius: 4 }}>src/config.js</code> y pega tu <strong>Project URL</strong> y tu <strong>anon key</strong> de Supabase (los encuentras en Settings → API de tu proyecto).</p>
+          <p style={{ color: C.muted, fontSize: 14 }}>Después vuelve a hacer deploy y la app quedará conectada.</p>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div style={{ minHeight: "100vh", background: C.bg, fontFamily: "'Karla', sans-serif", color: C.ink }}>
+      <div style={{ maxWidth: 980, margin: "0 auto", padding: "24px 16px 64px" }}>
+
+        {/* Cabecera */}
+        <header style={{ marginBottom: 24, borderBottom: `2px solid ${C.wine}`, paddingBottom: 16 }}>
+          <h1 style={{ fontFamily: "'Fraunces', serif", fontSize: "clamp(28px, 5vw, 40px)", margin: 0, fontWeight: 700, color: C.ink }}>
+            DNY Party Decoration
+          </h1>
+          <div style={{ fontFamily: "'Fraunces', serif", fontSize: 18, color: C.wineSoft, marginTop: 6 }}>Agenda de eventos</div>
+          {guardando && <div style={{ fontSize: 12, color: C.muted, marginTop: 4 }}>Guardando…</div>}
+          {errorMsg && <div style={{ fontSize: 13, color: "#A33", marginTop: 6, fontWeight: 600 }}>{errorMsg}</div>}
+        </header>
+
+        {/* ————— Buscador de clientes ————— */}
+        <section style={{ background: C.card, borderRadius: 14, border: `1px solid ${C.line}`, padding: 16, marginBottom: 24, boxShadow: "0 2px 10px rgba(92,31,46,0.06)" }}>
+          <div style={{ position: "relative" }}>
+            <span style={{ position: "absolute", left: 12, top: "50%", transform: "translateY(-50%)", color: C.muted, fontSize: 16 }}>🔍</span>
+            <input
+              style={{ ...s.input, paddingLeft: 38, paddingRight: busqueda ? 70 : 12 }}
+              value={busqueda}
+              onChange={(e) => setBusqueda(e.target.value)}
+              placeholder="Buscar cliente… (ej. María)"
+            />
+            {busqueda && (
+              <button onClick={() => setBusqueda("")} style={{ position: "absolute", right: 8, top: "50%", transform: "translateY(-50%)", background: "transparent", border: "none", color: C.muted, fontSize: 13, cursor: "pointer", fontFamily: "inherit", fontWeight: 600 }}>
+                Limpiar
+              </button>
+            )}
+          </div>
+
+          {busqueda.trim() && (
+            <div style={{ marginTop: 12 }}>
+              {resultados.length === 0 ? (
+                <p style={{ color: C.muted, margin: 0, fontSize: 14 }}>No se encontró ningún cliente con "{busqueda.trim()}".</p>
+              ) : (
+                <>
+                  <div style={{ fontSize: 12, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", color: C.gold, marginBottom: 8 }}>
+                    {resultados.length} {resultados.length === 1 ? "resultado" : "resultados"}
+                  </div>
+                  <div style={{ display: "grid", gap: 8 }}>
+                    {resultados.map(({ fecha, ev }) => (
+                      <button key={ev.id + fecha} onClick={() => abrirResultado(fecha, ev)}
+                        style={{ textAlign: "left", display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10, background: "#FDFBF7", border: `1px solid ${C.line}`, borderLeft: `4px solid ${ev.estado === "Confirmado" ? C.wine : C.gold}`, borderRadius: 10, padding: "10px 14px", cursor: "pointer", fontFamily: "inherit" }}>
+                        <div>
+                          <strong style={{ fontSize: 15, color: C.ink }}>{ev.cliente}</strong>
+                          <div style={{ fontSize: 13, color: C.wineSoft }}>{ev.tipo}{ev.hora ? ` · ${ev.hora}` : ""}{ev.lugar ? ` · ${ev.lugar}` : ""}</div>
+                        </div>
+                        <div style={{ textAlign: "right", whiteSpace: "nowrap" }}>
+                          <div style={{ fontWeight: 700, fontSize: 14, color: C.wine }}>{fmtFecha(fecha)} {fecha.slice(0, 4)}</div>
+                          <div style={{ fontSize: 11, fontWeight: 700, textTransform: "uppercase", color: ev.estado === "Confirmado" ? C.free : C.gold }}>{ev.estado}</div>
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                </>
+              )}
+            </div>
+          )}
+        </section>
+
+        <div style={{ display: "grid", gridTemplateColumns: "1fr", gap: 24 }}>
+          <style>{`@media(min-width:760px){ .grid2 { display:grid; grid-template-columns: 1.2fr 1fr; gap:24px; } .grid2 section+section { margin-top:0 !important; } }`}</style>
+          <div className="grid2">
+
+            {/* ————— Calendario ————— */}
+            <section style={{ background: C.card, borderRadius: 14, border: `1px solid ${C.line}`, padding: 18, boxShadow: "0 2px 10px rgba(92,31,46,0.06)" }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 }}>
+                <button onClick={() => cambiarMes(-1)} aria-label="Mes anterior" style={{ ...s.btnGhost, padding: "6px 14px", fontSize: 18 }}>‹</button>
+                <div style={{ fontFamily: "'Fraunces', serif", fontSize: 20, fontWeight: 700 }}>
+                  {MESES[vista.getMonth()]} {vista.getFullYear()}
+                </div>
+                <button onClick={() => cambiarMes(1)} aria-label="Mes siguiente" style={{ ...s.btnGhost, padding: "6px 14px", fontSize: 18 }}>›</button>
+              </div>
+
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(7,1fr)", gap: 4 }}>
+                {DIAS.map((d) => (
+                  <div key={d} style={{ textAlign: "center", fontSize: 11, fontWeight: 700, color: C.muted, textTransform: "uppercase", letterSpacing: "0.05em", padding: "4px 0" }}>{d}</div>
+                ))}
+                {celdas.map((f, i) => {
+                  if (!f) return <div key={"x" + i} />;
+                  const k = keyOf(f);
+                  const n = (eventos[k] || []).length;
+                  const esHoy = k === keyOf(hoy);
+                  const sel = k === diaSel;
+                  return (
+                    <button
+                      key={k}
+                      onClick={() => { setDiaSel(k); setForm(null); setConfirmando(false); }}
+                      style={{
+                        aspectRatio: "1", border: sel ? `2px solid ${C.wine}` : `1px solid ${n ? C.goldSoft : C.line}`,
+                        borderRadius: 10, background: n ? (n >= 2 ? C.wine : "#FBF3E2") : C.card,
+                        color: n >= 2 ? "#fff" : C.ink, cursor: "pointer", position: "relative",
+                        fontFamily: "inherit", fontSize: 15, fontWeight: esHoy ? 700 : 500,
+                        display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 2,
+                      }}
+                    >
+                      <span style={{ textDecoration: esHoy ? "underline" : "none", textUnderlineOffset: 3 }}>{f.getDate()}</span>
+                      {n > 0 && (
+                        <span style={{ display: "flex", gap: 2 }}>
+                          {Array.from({ length: Math.min(n, 3) }).map((_, j) => (
+                            <span key={j} style={{ width: 5, height: 5, borderRadius: "50%", background: n >= 2 ? C.goldSoft : C.gold }} />
+                          ))}
+                        </span>
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
+
+              <div style={{ display: "flex", gap: 14, marginTop: 12, fontSize: 12, color: C.muted, flexWrap: "wrap" }}>
+                <span><span style={{ display: "inline-block", width: 10, height: 10, borderRadius: 3, background: "#FBF3E2", border: `1px solid ${C.goldSoft}`, marginRight: 5, verticalAlign: "middle" }} />1 evento</span>
+                <span><span style={{ display: "inline-block", width: 10, height: 10, borderRadius: 3, background: C.wine, marginRight: 5, verticalAlign: "middle" }} />2 o más</span>
+              </div>
+            </section>
+
+            {/* ————— Panel del día ————— */}
+            <section style={{ background: C.card, borderRadius: 14, border: `1px solid ${C.line}`, padding: 18, marginTop: 24, boxShadow: "0 2px 10px rgba(92,31,46,0.06)" }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: 8, flexWrap: "wrap" }}>
+                <h2 style={{ fontFamily: "'Fraunces', serif", fontSize: 20, margin: 0 }}>{fmtFecha(diaSel)}</h2>
+                <span style={{ fontSize: 13, fontWeight: 700, color: ocupacion(evsDia.length).col }}>{ocupacion(evsDia.length).txt}</span>
+              </div>
+
+              {cargando ? (
+                <p style={{ color: C.muted }}>Cargando…</p>
+              ) : form ? (
+                <div style={{ marginTop: 14, display: "grid", gap: 12 }}>
+                  <div>
+                    <label style={s.label}>Cliente *</label>
+                    <input style={s.input} value={form.cliente} onChange={(e) => setForm({ ...form, cliente: e.target.value })} placeholder="Nombre del cliente" />
+                  </div>
+                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+                    <div>
+                      <label style={s.label}>Tipo</label>
+                      <select style={s.input} value={form.tipo} onChange={(e) => setForm({ ...form, tipo: e.target.value })}>
+                        {TIPOS.map((t) => <option key={t}>{t}</option>)}
+                      </select>
+                    </div>
+                    <div>
+                      <label style={s.label}>Hora</label>
+                      <input type="time" style={s.input} value={form.hora || ""} onChange={(e) => setForm({ ...form, hora: e.target.value })} />
+                    </div>
+                  </div>
+                  <div>
+                    <label style={s.label}>Lugar</label>
+                    <input style={s.input} value={form.lugar || ""} onChange={(e) => setForm({ ...form, lugar: e.target.value })} placeholder="Salón, dirección…" />
+                  </div>
+                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+                    <div>
+                      <label style={s.label}>Invitados</label>
+                      <input type="number" style={s.input} value={form.invitados || ""} onChange={(e) => setForm({ ...form, invitados: e.target.value })} placeholder="0" />
+                    </div>
+                    <div>
+                      <label style={s.label}>Estado</label>
+                      <select style={s.input} value={form.estado} onChange={(e) => setForm({ ...form, estado: e.target.value })}>
+                        <option>Pendiente</option>
+                        <option>Confirmado</option>
+                      </select>
+                    </div>
+                  </div>
+                  <div>
+                    <label style={s.label}>Notas</label>
+                    <textarea style={{ ...s.input, minHeight: 60, resize: "vertical" }} value={form.notas || ""} onChange={(e) => setForm({ ...form, notas: e.target.value })} placeholder="Menú, colores, detalles…" />
+                  </div>
+                  {confirmando ? (
+                    <div style={{ background: "#FBF3E2", border: `1px solid ${C.goldSoft}`, borderLeft: `4px solid ${C.gold}`, borderRadius: 10, padding: "14px 16px" }}>
+                      <div style={{ fontWeight: 700, color: C.wine, fontSize: 15, marginBottom: 6 }}>
+                        ⚠ Este día ya tiene {evsDia.length} {evsDia.length === 1 ? "evento registrado" : "eventos registrados"}
+                      </div>
+                      <div style={{ display: "grid", gap: 6, marginBottom: 12 }}>
+                        {evsDia.map((ev) => (
+                          <div key={ev.id} style={{ fontSize: 14, color: C.ink }}>
+                            • <strong>{ev.cliente}</strong> — {ev.tipo}{ev.hora ? `, ${ev.hora}` : ""}{ev.lugar ? `, ${ev.lugar}` : ""} <span style={{ color: ev.estado === "Confirmado" ? C.free : C.gold, fontWeight: 700, fontSize: 12 }}>({ev.estado})</span>
+                          </div>
+                        ))}
+                      </div>
+                      <div style={{ fontSize: 14, color: C.wineSoft, marginBottom: 12 }}>¿Seguro que quieres registrar también a <strong>{form.cliente}</strong> este día?</div>
+                      <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+                        <button style={s.btnPrim} onClick={guardarEvento}>Sí, registrar de todas formas</button>
+                        <button style={s.btnGhost} onClick={() => setConfirmando(false)}>No, volver</button>
+                      </div>
+                    </div>
+                  ) : (
+                  <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+                    <button style={{ ...s.btnPrim, opacity: form.cliente.trim() ? 1 : 0.5 }} onClick={intentarGuardar} disabled={!form.cliente.trim()}>
+                      {form.id ? "Guardar cambios" : "Registrar evento"}
+                    </button>
+                    <button style={s.btnGhost} onClick={() => { setForm(null); setConfirmando(false); }}>Cancelar</button>
+                    {form.id && (
+                      <button style={{ ...s.btnGhost, color: "#A33", borderColor: "#E5C5C5", marginLeft: "auto" }} onClick={() => eliminarEvento(form.id)}>Eliminar</button>
+                    )}
+                  </div>
+                  )}
+                </div>
+              ) : (
+                <>
+                  {evsDia.length === 0 ? (
+                    <p style={{ color: C.muted, margin: "14px 0" }}>No hay eventos registrados este día. Puedes tomar nuevos compromisos.</p>
+                  ) : (
+                    <div style={{ display: "grid", gap: 10, margin: "14px 0" }}>
+                      {evsDia.map((ev) => (
+                        <button key={ev.id} onClick={() => abrirEditar(ev)} style={{ textAlign: "left", background: "#FDFBF7", border: `1px solid ${C.line}`, borderLeft: `4px solid ${ev.estado === "Confirmado" ? C.wine : C.gold}`, borderRadius: 10, padding: "12px 14px", cursor: "pointer", fontFamily: "inherit" }}>
+                          <div style={{ display: "flex", justifyContent: "space-between", gap: 8, flexWrap: "wrap" }}>
+                            <strong style={{ fontSize: 15, color: C.ink }}>{ev.cliente}</strong>
+                            <span style={{ fontSize: 13, color: C.muted }}>{ev.hora || "sin hora"}</span>
+                          </div>
+                          <div style={{ fontSize: 13, color: C.wineSoft, marginTop: 2 }}>{ev.tipo}{ev.invitados ? ` · ${ev.invitados} invitados` : ""}</div>
+                          {ev.lugar && <div style={{ fontSize: 13, color: C.muted, marginTop: 2 }}>{ev.lugar}</div>}
+                          <div style={{ fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.05em", color: ev.estado === "Confirmado" ? C.free : C.gold, marginTop: 6 }}>{ev.estado}</div>
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                  <button style={{ ...s.btnPrim, width: "100%" }} onClick={abrirNuevo}>+ Registrar evento este día</button>
+                </>
+              )}
+            </section>
+          </div>
+
+          {/* ————— Vista semanal ————— */}
+          <section style={{ background: C.card, borderRadius: 14, border: `1px solid ${C.line}`, padding: 18, boxShadow: "0 2px 10px rgba(92,31,46,0.06)" }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8, flexWrap: "wrap", marginBottom: 4 }}>
+              <h2 style={{ fontFamily: "'Fraunces', serif", fontSize: 20, margin: 0 }}>Mi semana</h2>
+              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                <button onClick={() => setSemanaOffset(semanaOffset - 1)} aria-label="Semana anterior" style={{ ...s.btnGhost, padding: "4px 12px", fontSize: 16 }}>‹</button>
+                {semanaOffset !== 0 && (
+                  <button onClick={() => setSemanaOffset(0)} style={{ ...s.btnGhost, padding: "4px 12px", fontSize: 13 }}>Hoy</button>
+                )}
+                <button onClick={() => setSemanaOffset(semanaOffset + 1)} aria-label="Semana siguiente" style={{ ...s.btnGhost, padding: "4px 12px", fontSize: 16 }}>›</button>
+              </div>
+            </div>
+            <div style={{ fontSize: 13, color: C.muted, marginBottom: 14 }}>
+              Del {diasSemana[0].getDate()} de {MESES[diasSemana[0].getMonth()]} al {diasSemana[6].getDate()} de {MESES[diasSemana[6].getMonth()]}
+              {" · "}
+              <strong style={{ color: totalSemana ? C.wine : C.free }}>{totalSemana === 0 ? "semana libre" : `${totalSemana} ${totalSemana === 1 ? "evento" : "eventos"}`}</strong>
+            </div>
+
+            <div style={{ display: "grid", gap: 6 }}>
+              {diasSemana.map((d, i) => {
+                const k = keyOf(d);
+                const list = eventos[k] || [];
+                const esHoy = k === keyOf(new Date());
+                return (
+                  <button key={k} onClick={() => irADia(k)}
+                    style={{
+                      display: "flex", gap: 14, alignItems: "flex-start", textAlign: "left",
+                      background: esHoy ? "#FBF3E2" : "transparent",
+                      border: "none", borderBottom: i < 6 ? `1px solid ${C.line}` : "none",
+                      borderRadius: esHoy ? 10 : 0, padding: "10px 8px", cursor: "pointer", fontFamily: "inherit",
+                    }}>
+                    <div style={{ minWidth: 52, textAlign: "center" }}>
+                      <div style={{ fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.05em", color: esHoy ? C.wine : C.muted }}>{DIAS[i]}</div>
+                      <div style={{ fontFamily: "'Fraunces', serif", fontSize: 22, fontWeight: 700, color: list.length ? C.wine : C.ink }}>{d.getDate()}</div>
+                    </div>
+                    <div style={{ flex: 1, paddingTop: 2 }}>
+                      {list.length === 0 ? (
+                        <span style={{ fontSize: 13, color: C.free }}>Libre</span>
+                      ) : (
+                        <div style={{ display: "grid", gap: 4 }}>
+                          {list.map((ev) => (
+                            <div key={ev.id} style={{ fontSize: 14, color: C.ink }}>
+                              <strong>{ev.cliente}</strong>
+                              <span style={{ color: C.muted }}>{ev.hora ? ` · ${ev.hora}` : ""} · {ev.tipo}</span>
+                              <span style={{ fontSize: 11, fontWeight: 700, textTransform: "uppercase", color: ev.estado === "Confirmado" ? C.free : C.gold }}> {ev.estado}</span>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+          </section>
+
+          {/* ————— Próximos eventos ————— */}
+          <section style={{ background: C.card, borderRadius: 14, border: `1px solid ${C.line}`, padding: 18 }}>
+            <h2 style={{ fontFamily: "'Fraunces', serif", fontSize: 20, margin: "0 0 12px" }}>Próximos eventos</h2>
+            {proximos.length === 0 ? (
+              <p style={{ color: C.muted, margin: 0 }}>Sin eventos próximos registrados.</p>
+            ) : (
+              <div style={{ display: "grid", gap: 8 }}>
+                {proximos.map(([k, list]) => (
+                  <button key={k} onClick={() => { irADia(k); window.scrollTo({ top: 0, behavior: "smooth" }); }}
+                    style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10, background: "transparent", border: "none", borderBottom: `1px solid ${C.line}`, padding: "10px 2px", cursor: "pointer", fontFamily: "inherit", textAlign: "left" }}>
+                    <div>
+                      <div style={{ fontWeight: 700, fontSize: 14, color: C.ink }}>{fmtFecha(k)}</div>
+                      <div style={{ fontSize: 13, color: C.muted }}>{list.map((e) => e.cliente).join(" · ")}</div>
+                    </div>
+                    <span style={{ fontSize: 12, fontWeight: 700, color: list.length >= 2 ? C.wine : C.gold, whiteSpace: "nowrap" }}>{list.length} {list.length === 1 ? "evento" : "eventos"}</span>
+                  </button>
+                ))}
+              </div>
+            )}
+          </section>
+        </div>
+      </div>
+    </div>
+  );
+}
