@@ -374,8 +374,8 @@ export default function App() {
     <div style={{ minHeight: "100vh", background: C.bg, fontFamily: "'Karla', sans-serif", color: C.ink }}>
       {/* ————— Hoja imprimible: eventos de la semana ————— */}
       <style>{`
-        html, body { overflow-x: hidden; max-width: 100%; }
-        #root { overflow-x: hidden; max-width: 100vw; }
+        html, body { height: 100%; overflow: hidden; position: fixed; inset: 0; width: 100%; }
+        #root { height: 100dvh; overflow-y: auto; overflow-x: hidden; -webkit-overflow-scrolling: touch; width: 100vw; }
         * { min-width: 0; }
         .solo-impresion { display: none; }
         @media print {
@@ -770,7 +770,7 @@ export default function App() {
             ) : (
               <div style={{ display: "grid", gap: 8 }}>
                 {proximos.map(([k, list]) => (
-                  <button key={k} onClick={() => { irADia(k); window.scrollTo({ top: 0, behavior: "smooth" }); }}
+                  <button key={k} onClick={() => { irADia(k); const r = document.getElementById("root"); if (r) r.scrollTo({ top: 0, behavior: "smooth" }); window.scrollTo({ top: 0, behavior: "smooth" }); }}
                     style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10, background: "transparent", border: "none", borderBottom: `1px solid ${C.line}`, padding: "10px 2px", cursor: "pointer", fontFamily: "inherit", textAlign: "left" }}>
                     <div>
                       <div style={{ fontWeight: 700, fontSize: 14, color: C.ink }}>{fmtFecha(k)}</div>
