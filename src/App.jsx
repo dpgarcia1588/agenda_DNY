@@ -372,6 +372,55 @@ export default function App() {
 
   return (
     <div style={{ minHeight: "100vh", background: C.bg, fontFamily: "'Karla', sans-serif", color: C.ink }}>
+      {/* ————— Hoja imprimible: eventos de la semana ————— */}
+      <style>{`
+        .solo-impresion { display: none; }
+        @media print {
+          body * { visibility: hidden; }
+          .solo-impresion, .solo-impresion * { visibility: visible; }
+          .solo-impresion { display: block !important; position: absolute; left: 0; top: 0; width: 100%; }
+          @page { margin: 14mm; }
+        }
+      `}</style>
+      <div className="solo-impresion" style={{ fontFamily: "Georgia, 'Times New Roman', serif", color: "#000" }}>
+        <div style={{ textAlign: "center", borderBottom: "2px solid #000", paddingBottom: 10, marginBottom: 4 }}>
+          <div style={{ fontSize: 24, fontWeight: 700 }}>DNY Party Decoration</div>
+          <div style={{ fontSize: 14 }}>Eventos de la semana · Del {diasSemana[0].getDate()} de {MESES[diasSemana[0].getMonth()]} al {diasSemana[6].getDate()} de {MESES[diasSemana[6].getMonth()]} de {diasSemana[6].getFullYear()}</div>
+          <div style={{ fontSize: 11, marginTop: 2 }}>Total: {totalSemana} {totalSemana === 1 ? "evento" : "eventos"} · Impreso el {new Date().getDate()} de {MESES[new Date().getMonth()]} de {new Date().getFullYear()}</div>
+        </div>
+        {diasSemana.map((d, i) => {
+          const k = keyOf(d);
+          const list = eventos[k] || [];
+          return (
+            <div key={k} style={{ borderBottom: "1px solid #999", padding: "8px 0", breakInside: "avoid" }}>
+              <div style={{ fontWeight: 700, fontSize: 14 }}>
+                {DIAS[i]} {d.getDate()} de {MESES[d.getMonth()]}
+                {list.length === 0 ? <span style={{ fontWeight: 400 }}> — Libre</span> : <span style={{ fontWeight: 400 }}> — {list.length} {list.length === 1 ? "evento" : "eventos"}</span>}
+              </div>
+              {list.map((ev) => (
+                <div key={ev.id} style={{ fontSize: 12, margin: "6px 0 6px 14px", lineHeight: 1.5 }}>
+                  <div><strong>{ev.cliente}</strong>{ev.evento ? ` — ${ev.evento}` : ""} · {ev.tipo} · <strong>{ev.estado}</strong></div>
+                  <div>
+                    {ev.hora ? `Hora: ${ev.hora}` : "Hora: por definir"}
+                    {ev.invitados ? ` · Invitados: ${ev.invitados}` : ""}
+                    {ev.lugar ? ` · Lugar: ${ev.lugar}` : ""}
+                  </div>
+                  {ev.notas && <div>Notas: {ev.notas}</div>}
+                </div>
+              ))}
+            </div>
+          );
+        })}
+        <div style={{ marginTop: 24, display: "flex", justifyContent: "space-between", fontSize: 12 }}>
+          <div style={{ width: "45%" }}>
+            <div style={{ borderTop: "1px solid #000", paddingTop: 4 }}>Notas</div>
+          </div>
+          <div style={{ width: "35%" }}>
+            <div style={{ borderTop: "1px solid #000", paddingTop: 4 }}>Responsable / Firma</div>
+          </div>
+        </div>
+      </div>
+
       <div style={{ maxWidth: 980, margin: "0 auto", padding: "24px 16px 64px" }}>
 
         {/* Cabecera */}
@@ -666,6 +715,7 @@ export default function App() {
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8, flexWrap: "wrap", marginBottom: 4 }}>
               <h2 style={{ fontFamily: "'Fraunces', serif", fontSize: 20, margin: 0 }}>Mi semana</h2>
               <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                <button onClick={() => window.print()} style={{ ...s.btnGhost, padding: "4px 12px", fontSize: 13, fontWeight: 700 }}>🖨 Imprimir</button>
                 <button onClick={() => setSemanaOffset(semanaOffset - 1)} aria-label="Semana anterior" style={{ ...s.btnGhost, padding: "4px 12px", fontSize: 16 }}>‹</button>
                 {semanaOffset !== 0 && (
                   <button onClick={() => setSemanaOffset(0)} style={{ ...s.btnGhost, padding: "4px 12px", fontSize: 13 }}>Hoy</button>
