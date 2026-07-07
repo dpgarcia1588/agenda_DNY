@@ -411,14 +411,6 @@ export default function App() {
             </div>
           );
         })}
-        <div style={{ marginTop: 24, display: "flex", justifyContent: "space-between", fontSize: 12 }}>
-          <div style={{ width: "45%" }}>
-            <div style={{ borderTop: "1px solid #000", paddingTop: 4 }}>Notas</div>
-          </div>
-          <div style={{ width: "35%" }}>
-            <div style={{ borderTop: "1px solid #000", paddingTop: 4 }}>Responsable / Firma</div>
-          </div>
-        </div>
       </div>
 
       <div style={{ maxWidth: 980, margin: "0 auto", padding: "24px 16px 64px" }}>
