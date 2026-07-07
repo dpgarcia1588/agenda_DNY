@@ -113,7 +113,9 @@ export default function App() {
 
   // ————— Abrir evento llegado por enlace (?evento=ID) —————
   useEffect(() => {
-    if (!eventoUrl || cargando) return;
+    if (!eventoUrl) return;
+    if (!sesion || cargando) return; // esperar a que haya sesión y eventos cargados
+    if (Object.keys(eventos).length === 0) return; // aún no llegan los datos
     for (const [k, list] of Object.entries(eventos)) {
       const ev = list.find((e) => String(e.id) === String(eventoUrl));
       if (ev) {
@@ -128,7 +130,7 @@ export default function App() {
     }
     setEventoUrl(null);
     window.history.replaceState({}, "", window.location.pathname);
-  }, [eventos, cargando, eventoUrl]);
+  }, [eventos, cargando, eventoUrl, sesion]);
 
   // ————— Calendario —————
   const celdas = useMemo(() => {
