@@ -38,6 +38,7 @@ export default function App() {
   const [semanaOffset, setSemanaOffset] = useState(0);
   const [errorMsg, setErrorMsg] = useState("");
   const [gcalSugerido, setGcalSugerido] = useState(null); // {fecha, ev} tras registrar
+  const [confirmandoEliminar, setConfirmandoEliminar] = useState(false);
 
   // ————— Sesión (inicio de sesión requerido) —————
   const [sesion, setSesion] = useState(null);
@@ -165,8 +166,8 @@ export default function App() {
   }, [busqueda, eventos]);
 
   // ————— Acciones —————
-  const abrirNuevo = () => { setConfirmando(false); setForm({ id: null, cliente: "", evento: "", tipo: TIPOS[2], hora: "", lugar: "", invitados: "", notas: "", estado: "Pendiente" }); };
-  const abrirEditar = (ev) => { setConfirmando(false); setForm({ ...ev }); };
+  const abrirNuevo = () => { setConfirmando(false); setConfirmandoEliminar(false); setForm({ id: null, cliente: "", evento: "", tipo: TIPOS[2], hora: "", lugar: "", invitados: "", notas: "", estado: "Pendiente" }); };
+  const abrirEditar = (ev) => { setConfirmando(false); setConfirmandoEliminar(false); setForm({ ...ev }); };
 
   const intentarGuardar = () => {
     if (!form.cliente.trim()) return;
@@ -197,6 +198,7 @@ export default function App() {
       let error;
       if (form.id) {
         registro.modificado_por = sesion.user?.email || null;
+        registro.modificado_en = new Date().toISOString();
         ({ error } = await supabase.from("eventos").update(registro).eq("id", form.id));
       } else {
         registro.creado_por = sesion.user?.email || null;
@@ -252,6 +254,12 @@ export default function App() {
     const [y, m, d] = k.split("-").map(Number);
     const f = new Date(y, m - 1, d);
     return `${DIAS[(f.getDay() + 6) % 7]} ${d} de ${MESES[m - 1]}`;
+  };
+
+  const fmtFechaHora = (iso) => {
+    if (!iso) return "";
+    const f = new Date(iso);
+    return `${f.getDate()} de ${MESES[f.getMonth()]} ${f.getFullYear()}, ${pad(f.getHours())}:${pad(f.getMinutes())}`;
   };
 
   // ————— Enlace a Google Calendar con los datos pre-llenados —————
@@ -522,10 +530,10 @@ export default function App() {
                     <label style={s.label}>Notas</label>
                     <textarea style={{ ...s.input, minHeight: 60, resize: "vertical" }} value={form.notas || ""} onChange={(e) => setForm({ ...form, notas: e.target.value })} placeholder="Menú, colores, detalles…" />
                   </div>
-                  {form.id && (form.creado_por || form.modificado_por) && (
+                  {form.id && (form.creado_por || form.modificado_por || form.created_at) && (
                     <div style={{ fontSize: 12, color: C.muted, background: "#FDFBF7", border: `1px solid ${C.line}`, borderRadius: 8, padding: "8px 12px" }}>
-                      {form.creado_por && <div>Registrado por: <strong>{form.creado_por}</strong></div>}
-                      {form.modificado_por && <div>Última modificación por: <strong>{form.modificado_por}</strong></div>}
+                      {(form.creado_por || form.created_at) && <div>Registrado{form.creado_por ? <> por <strong>{form.creado_por}</strong></> : ""}{form.created_at ? ` el ${fmtFechaHora(form.created_at)}` : ""}</div>}
+                      {form.modificado_por && <div>Última modificación por <strong>{form.modificado_por}</strong>{form.modificado_en ? ` el ${fmtFechaHora(form.modificado_en)}` : ""}</div>}
                     </div>
                   )}
                   {form.id && (
@@ -559,9 +567,23 @@ export default function App() {
                     </button>
                     <button style={s.btnGhost} onClick={() => { setForm(null); setConfirmando(false); }}>Cancelar</button>
                     {form.id && (
-                      <button style={{ ...s.btnGhost, color: "#A33", borderColor: "#E5C5C5", marginLeft: "auto" }} onClick={() => eliminarEvento(form.id)}>Eliminar</button>
+                      <button style={{ ...s.btnGhost, color: "#A33", borderColor: "#E5C5C5", marginLeft: "auto" }} onClick={() => setConfirmandoEliminar(true)}>Eliminar</button>
                     )}
                   </div>
+                  )}
+                  {confirmandoEliminar && form.id && (
+                    <div style={{ background: "#FBEFEF", border: "1px solid #E5C5C5", borderLeft: "4px solid #A33", borderRadius: 10, padding: "14px 16px" }}>
+                      <div style={{ fontWeight: 700, color: "#A33", fontSize: 15, marginBottom: 6 }}>
+                        ⚠ ¿Eliminar este evento?
+                      </div>
+                      <div style={{ fontSize: 14, color: C.ink, marginBottom: 12 }}>
+                        Se borrará <strong>{form.cliente}</strong>{form.evento ? ` — ${form.evento}` : ""} del {fmtFecha(diaSel)}. Esta acción no se puede deshacer.
+                      </div>
+                      <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+                        <button style={{ ...s.btnPrim, background: "#A33" }} onClick={() => { setConfirmandoEliminar(false); eliminarEvento(form.id); }}>Sí, eliminar</button>
+                        <button style={s.btnGhost} onClick={() => setConfirmandoEliminar(false)}>No, conservar</button>
+                      </div>
+                    </div>
                   )}
                 </div>
               ) : (
