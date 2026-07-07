@@ -374,6 +374,9 @@ export default function App() {
     <div style={{ minHeight: "100vh", background: C.bg, fontFamily: "'Karla', sans-serif", color: C.ink }}>
       {/* ————— Hoja imprimible: eventos de la semana ————— */}
       <style>{`
+        html, body { overflow-x: hidden; max-width: 100%; }
+        #root { overflow-x: hidden; max-width: 100vw; }
+        * { min-width: 0; }
         .solo-impresion { display: none; }
         @media print {
           body * { visibility: hidden; }
