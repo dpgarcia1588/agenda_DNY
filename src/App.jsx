@@ -37,6 +37,7 @@ export default function App() {
   const [busqueda, setBusqueda] = useState("");
   const [semanaOffset, setSemanaOffset] = useState(0);
   const [errorMsg, setErrorMsg] = useState("");
+  const [gcalSugerido, setGcalSugerido] = useState(null); // {fecha, ev} tras registrar
 
   // ————— Sesión (inicio de sesión requerido) —————
   const [sesion, setSesion] = useState(null);
@@ -164,7 +165,7 @@ export default function App() {
   }, [busqueda, eventos]);
 
   // ————— Acciones —————
-  const abrirNuevo = () => { setConfirmando(false); setForm({ id: null, cliente: "", tipo: TIPOS[2], hora: "", lugar: "", invitados: "", notas: "", estado: "Pendiente" }); };
+  const abrirNuevo = () => { setConfirmando(false); setForm({ id: null, cliente: "", evento: "", tipo: TIPOS[2], hora: "", lugar: "", invitados: "", notas: "", estado: "Pendiente" }); };
   const abrirEditar = (ev) => { setConfirmando(false); setForm({ ...ev }); };
 
   const intentarGuardar = () => {
@@ -185,6 +186,7 @@ export default function App() {
       const registro = {
         fecha: diaSel,
         cliente: form.cliente.trim(),
+        evento: form.evento ? form.evento.trim() : null,
         tipo: form.tipo,
         hora: form.hora || null,
         lugar: form.lugar || null,
@@ -201,6 +203,7 @@ export default function App() {
         ({ error } = await supabase.from("eventos").insert(registro));
       }
       if (error) throw error;
+      if (!form.id) setGcalSugerido({ fecha: diaSel, ev: { ...registro } });
       await cargarEventos();
       setForm(null);
       setErrorMsg("");
@@ -249,6 +252,33 @@ export default function App() {
     const [y, m, d] = k.split("-").map(Number);
     const f = new Date(y, m - 1, d);
     return `${DIAS[(f.getDay() + 6) % 7]} ${d} de ${MESES[m - 1]}`;
+  };
+
+  // ————— Enlace a Google Calendar con los datos pre-llenados —————
+  const linkGoogleCalendar = (fecha, ev) => {
+    const [y, m, d] = fecha.split("-").map(Number);
+    const titulo = `${ev.evento ? ev.evento + " — " : ""}${ev.cliente} (DNY)`;
+    let dates;
+    if (ev.hora) {
+      const [hh, mm] = ev.hora.split(":").map(Number);
+      const ini = new Date(y, m - 1, d, hh, mm);
+      const fin = new Date(ini.getTime() + 2 * 60 * 60 * 1000); // 2 horas por defecto
+      const f = (x) => `${x.getFullYear()}${pad(x.getMonth() + 1)}${pad(x.getDate())}T${pad(x.getHours())}${pad(x.getMinutes())}00`;
+      dates = `${f(ini)}/${f(fin)}`;
+    } else {
+      const dia = `${y}${pad(m)}${pad(d)}`;
+      const sig = new Date(y, m - 1, d + 1);
+      dates = `${dia}/${sig.getFullYear()}${pad(sig.getMonth() + 1)}${pad(sig.getDate())}`; // todo el día
+    }
+    const detalles = [
+      ev.tipo ? `Servicio: ${ev.tipo}` : "",
+      ev.invitados ? `Invitados: ${ev.invitados}` : "",
+      ev.estado ? `Estado: ${ev.estado}` : "",
+      ev.notas ? `Notas: ${ev.notas}` : "",
+    ].filter(Boolean).join("\n");
+    const params = new URLSearchParams({ action: "TEMPLATE", text: titulo, dates, details: detalles });
+    if (ev.lugar) params.set("location", ev.lugar);
+    return `https://calendar.google.com/calendar/render?${params.toString()}`;
   };
 
   // ————— Estilos base —————
@@ -361,7 +391,7 @@ export default function App() {
                         style={{ textAlign: "left", display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10, background: "#FDFBF7", border: `1px solid ${C.line}`, borderLeft: `4px solid ${ev.estado === "Confirmado" ? C.wine : C.gold}`, borderRadius: 10, padding: "10px 14px", cursor: "pointer", fontFamily: "inherit" }}>
                         <div>
                           <strong style={{ fontSize: 15, color: C.ink }}>{ev.cliente}</strong>
-                          <div style={{ fontSize: 13, color: C.wineSoft }}>{ev.tipo}{ev.hora ? ` · ${ev.hora}` : ""}{ev.lugar ? ` · ${ev.lugar}` : ""}</div>
+                          <div style={{ fontSize: 13, color: C.wineSoft }}>{ev.evento ? `${ev.evento} · ` : ""}{ev.tipo}{ev.hora ? ` · ${ev.hora}` : ""}{ev.lugar ? ` · ${ev.lugar}` : ""}</div>
                         </div>
                         <div style={{ textAlign: "right", whiteSpace: "nowrap" }}>
                           <div style={{ fontWeight: 700, fontSize: 14, color: C.wine }}>{fmtFecha(fecha)} {fecha.slice(0, 4)}</div>
@@ -446,6 +476,10 @@ export default function App() {
                     <label style={s.label}>Cliente *</label>
                     <input style={s.input} value={form.cliente} onChange={(e) => setForm({ ...form, cliente: e.target.value })} placeholder="Nombre del cliente" />
                   </div>
+                  <div>
+                    <label style={s.label}>Evento</label>
+                    <input style={s.input} value={form.evento || ""} onChange={(e) => setForm({ ...form, evento: e.target.value })} placeholder="Boda, Cumpleaños, Baby shower…" />
+                  </div>
                   <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
                     <div>
                       <label style={s.label}>Tipo</label>
@@ -485,6 +519,12 @@ export default function App() {
                       {form.modificado_por && <div>Última modificación por: <strong>{form.modificado_por}</strong></div>}
                     </div>
                   )}
+                  {form.id && (
+                    <a href={linkGoogleCalendar(diaSel, form)} target="_blank" rel="noopener noreferrer"
+                      style={{ ...s.btnGhost, textAlign: "center", textDecoration: "none", display: "block", borderColor: C.goldSoft, color: C.gold, fontWeight: 700 }}>
+                      📅 Agregar a Google Calendar
+                    </a>
+                  )}
                   {confirmando ? (
                     <div style={{ background: "#FBF3E2", border: `1px solid ${C.goldSoft}`, borderLeft: `4px solid ${C.gold}`, borderRadius: 10, padding: "14px 16px" }}>
                       <div style={{ fontWeight: 700, color: C.wine, fontSize: 15, marginBottom: 6 }}>
@@ -493,7 +533,7 @@ export default function App() {
                       <div style={{ display: "grid", gap: 6, marginBottom: 12 }}>
                         {evsDia.map((ev) => (
                           <div key={ev.id} style={{ fontSize: 14, color: C.ink }}>
-                            • <strong>{ev.cliente}</strong> — {ev.tipo}{ev.hora ? `, ${ev.hora}` : ""}{ev.lugar ? `, ${ev.lugar}` : ""} <span style={{ color: ev.estado === "Confirmado" ? C.free : C.gold, fontWeight: 700, fontSize: 12 }}>({ev.estado})</span>
+                            • <strong>{ev.cliente}</strong> — {ev.evento ? `${ev.evento}, ` : ""}{ev.tipo}{ev.hora ? `, ${ev.hora}` : ""}{ev.lugar ? `, ${ev.lugar}` : ""} <span style={{ color: ev.estado === "Confirmado" ? C.free : C.gold, fontWeight: 700, fontSize: 12 }}>({ev.estado})</span>
                           </div>
                         ))}
                       </div>
@@ -517,6 +557,19 @@ export default function App() {
                 </div>
               ) : (
                 <>
+                  {gcalSugerido && gcalSugerido.fecha === diaSel && (
+                    <div style={{ background: "#EFF6F0", border: "1px solid #C9E0CE", borderLeft: `4px solid ${C.free}`, borderRadius: 10, padding: "12px 14px", margin: "14px 0 0" }}>
+                      <div style={{ fontWeight: 700, color: C.free, fontSize: 14, marginBottom: 8 }}>✓ Evento registrado</div>
+                      <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+                        <a href={linkGoogleCalendar(gcalSugerido.fecha, gcalSugerido.ev)} target="_blank" rel="noopener noreferrer"
+                          onClick={() => setGcalSugerido(null)}
+                          style={{ ...s.btnPrim, textDecoration: "none", background: C.free, padding: "8px 14px", fontSize: 14 }}>
+                          📅 Agregar a Google Calendar
+                        </a>
+                        <button onClick={() => setGcalSugerido(null)} style={{ ...s.btnGhost, padding: "8px 14px", fontSize: 14 }}>Omitir</button>
+                      </div>
+                    </div>
+                  )}
                   {evsDia.length === 0 ? (
                     <p style={{ color: C.muted, margin: "14px 0" }}>No hay eventos registrados este día. Puedes tomar nuevos compromisos.</p>
                   ) : (
@@ -527,7 +580,7 @@ export default function App() {
                             <strong style={{ fontSize: 15, color: C.ink }}>{ev.cliente}</strong>
                             <span style={{ fontSize: 13, color: C.muted }}>{ev.hora || "sin hora"}</span>
                           </div>
-                          <div style={{ fontSize: 13, color: C.wineSoft, marginTop: 2 }}>{ev.tipo}{ev.invitados ? ` · ${ev.invitados} invitados` : ""}</div>
+                          <div style={{ fontSize: 13, color: C.wineSoft, marginTop: 2 }}>{ev.evento ? `${ev.evento} · ` : ""}{ev.tipo}{ev.invitados ? ` · ${ev.invitados} invitados` : ""}</div>
                           {ev.lugar && <div style={{ fontSize: 13, color: C.muted, marginTop: 2 }}>{ev.lugar}</div>}
                           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8, flexWrap: "wrap", marginTop: 6 }}>
                             <span style={{ fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.05em", color: ev.estado === "Confirmado" ? C.free : C.gold }}>{ev.estado}</span>
@@ -586,7 +639,7 @@ export default function App() {
                           {list.map((ev) => (
                             <div key={ev.id} style={{ fontSize: 14, color: C.ink }}>
                               <strong>{ev.cliente}</strong>
-                              <span style={{ color: C.muted }}>{ev.hora ? ` · ${ev.hora}` : ""} · {ev.tipo}</span>
+                              <span style={{ color: C.muted }}>{ev.evento ? ` · ${ev.evento}` : ""}{ev.hora ? ` · ${ev.hora}` : ""} · {ev.tipo}</span>
                               <span style={{ fontSize: 11, fontWeight: 700, textTransform: "uppercase", color: ev.estado === "Confirmado" ? C.free : C.gold }}> {ev.estado}</span>
                             </div>
                           ))}
