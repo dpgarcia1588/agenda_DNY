@@ -39,6 +39,7 @@ export default function App() {
   const [errorMsg, setErrorMsg] = useState("");
   const [gcalSugerido, setGcalSugerido] = useState(null); // {fecha, ev} tras registrar
   const [confirmandoEliminar, setConfirmandoEliminar] = useState(false);
+  const [eventoUrl, setEventoUrl] = useState(() => new URLSearchParams(window.location.search).get("evento"));
 
   // ————— Sesión (inicio de sesión requerido) —————
   const [sesion, setSesion] = useState(null);
@@ -109,6 +110,25 @@ export default function App() {
       document.removeEventListener("visibilitychange", alVolver);
     };
   }, [sesion]);
+
+  // ————— Abrir evento llegado por enlace (?evento=ID) —————
+  useEffect(() => {
+    if (!eventoUrl || cargando) return;
+    for (const [k, list] of Object.entries(eventos)) {
+      const ev = list.find((e) => String(e.id) === String(eventoUrl));
+      if (ev) {
+        setDiaSel(k);
+        setConfirmando(false);
+        setConfirmandoEliminar(false);
+        setForm({ ...ev });
+        const [y, m] = k.split("-").map(Number);
+        setVista(new Date(y, m - 1, 1));
+        break;
+      }
+    }
+    setEventoUrl(null);
+    window.history.replaceState({}, "", window.location.pathname);
+  }, [eventos, cargando, eventoUrl]);
 
   // ————— Calendario —————
   const celdas = useMemo(() => {
