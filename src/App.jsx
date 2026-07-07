@@ -202,10 +202,11 @@ export default function App() {
         ({ error } = await supabase.from("eventos").update(registro).eq("id", form.id));
       } else {
         registro.creado_por = sesion.user?.email || null;
-        ({ error } = await supabase.from("eventos").insert(registro));
+        const res = await supabase.from("eventos").insert(registro).select().single();
+        error = res.error;
+        if (!error && res.data) setGcalSugerido({ fecha: diaSel, ev: res.data });
       }
       if (error) throw error;
-      if (!form.id) setGcalSugerido({ fecha: diaSel, ev: { ...registro } });
       await cargarEventos();
       setForm(null);
       setErrorMsg("");
@@ -287,6 +288,28 @@ export default function App() {
     const params = new URLSearchParams({ action: "TEMPLATE", text: titulo, dates, details: detalles });
     if (ev.lugar) params.set("location", ev.lugar);
     return `https://calendar.google.com/calendar/render?${params.toString()}`;
+  };
+
+  // Marcar / desmarcar que el evento ya fue agregado a Google Calendar
+  const marcarGcal = async (id) => {
+    try {
+      const { error } = await supabase.from("eventos").update({
+        gcal_por: sesion.user?.email || null,
+        gcal_en: new Date().toISOString(),
+      }).eq("id", id);
+      if (error) throw error;
+      await cargarEventos();
+      if (form && form.id === id) setForm({ ...form, gcal_por: sesion.user?.email || null, gcal_en: new Date().toISOString() });
+    } catch (e) { console.error(e); }
+  };
+
+  const desmarcarGcal = async (id) => {
+    try {
+      const { error } = await supabase.from("eventos").update({ gcal_por: null, gcal_en: null }).eq("id", id);
+      if (error) throw error;
+      await cargarEventos();
+      if (form && form.id === id) setForm({ ...form, gcal_por: null, gcal_en: null });
+    } catch (e) { console.error(e); }
   };
 
   // ————— Estilos base —————
@@ -536,11 +559,22 @@ export default function App() {
                       {form.modificado_por && <div>Última modificación por <strong>{form.modificado_por}</strong>{form.modificado_en ? ` el ${fmtFechaHora(form.modificado_en)}` : ""}</div>}
                     </div>
                   )}
-                  {form.id && (
+                  {form.id && !form.gcal_por && (
                     <a href={linkGoogleCalendar(diaSel, form)} target="_blank" rel="noopener noreferrer"
+                      onClick={() => marcarGcal(form.id)}
                       style={{ ...s.btnGhost, textAlign: "center", textDecoration: "none", display: "block", borderColor: C.goldSoft, color: C.gold, fontWeight: 700 }}>
                       📅 Agregar a Google Calendar
                     </a>
+                  )}
+                  {form.id && form.gcal_por && (
+                    <div style={{ background: "#EFF6F0", border: "1px solid #C9E0CE", borderRadius: 8, padding: "10px 12px", fontSize: 13, color: C.ink }}>
+                      <div style={{ color: C.free, fontWeight: 700, marginBottom: 4 }}>✓ Agregado a Google Calendar</div>
+                      <div style={{ color: C.muted, fontSize: 12 }}>Por {form.gcal_por}{form.gcal_en ? ` el ${fmtFechaHora(form.gcal_en)}` : ""}</div>
+                      <div style={{ display: "flex", gap: 12, marginTop: 8 }}>
+                        <a href={linkGoogleCalendar(diaSel, form)} target="_blank" rel="noopener noreferrer" style={{ color: C.wine, fontSize: 13, fontWeight: 600 }}>Volver a abrir</a>
+                        <button onClick={() => desmarcarGcal(form.id)} style={{ background: "none", border: "none", color: C.muted, fontSize: 13, cursor: "pointer", fontFamily: "inherit", textDecoration: "underline", padding: 0 }}>Desmarcar</button>
+                      </div>
+                    </div>
                   )}
                   {confirmando ? (
                     <div style={{ background: "#FBF3E2", border: `1px solid ${C.goldSoft}`, borderLeft: `4px solid ${C.gold}`, borderRadius: 10, padding: "14px 16px" }}>
@@ -593,7 +627,7 @@ export default function App() {
                       <div style={{ fontWeight: 700, color: C.free, fontSize: 14, marginBottom: 8 }}>✓ Evento registrado</div>
                       <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
                         <a href={linkGoogleCalendar(gcalSugerido.fecha, gcalSugerido.ev)} target="_blank" rel="noopener noreferrer"
-                          onClick={() => setGcalSugerido(null)}
+                          onClick={() => { if (gcalSugerido.ev.id) marcarGcal(gcalSugerido.ev.id); setGcalSugerido(null); }}
                           style={{ ...s.btnPrim, textDecoration: "none", background: C.free, padding: "8px 14px", fontSize: 14 }}>
                           📅 Agregar a Google Calendar
                         </a>
@@ -614,7 +648,7 @@ export default function App() {
                           <div style={{ fontSize: 13, color: C.wineSoft, marginTop: 2 }}>{ev.evento ? `${ev.evento} · ` : ""}{ev.tipo}{ev.invitados ? ` · ${ev.invitados} invitados` : ""}</div>
                           {ev.lugar && <div style={{ fontSize: 13, color: C.muted, marginTop: 2 }}>{ev.lugar}</div>}
                           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8, flexWrap: "wrap", marginTop: 6 }}>
-                            <span style={{ fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.05em", color: ev.estado === "Confirmado" ? C.free : C.gold }}>{ev.estado}</span>
+                            <span style={{ fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.05em", color: ev.estado === "Confirmado" ? C.free : C.gold }}>{ev.estado}{ev.gcal_por ? " · 📅✓" : ""}</span>
                             {ev.creado_por && <span style={{ fontSize: 11, color: C.muted }}>Registrado por {ev.creado_por}</span>}
                           </div>
                         </button>
