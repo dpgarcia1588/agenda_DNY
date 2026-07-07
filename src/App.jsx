@@ -494,7 +494,16 @@ export default function App() {
                   </div>
                   <div>
                     <label style={s.label}>Lugar</label>
-                    <input style={s.input} value={form.lugar || ""} onChange={(e) => setForm({ ...form, lugar: e.target.value })} placeholder="Salón, dirección…" />
+                    <div style={{ display: "flex", gap: 8 }}>
+                      <input style={{ ...s.input, flex: 1 }} value={form.lugar || ""} onChange={(e) => setForm({ ...form, lugar: e.target.value })} placeholder="Salón, dirección…" />
+                      {form.lugar && form.lugar.trim() && (
+                        <a href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(form.lugar.trim())}`}
+                          target="_blank" rel="noopener noreferrer"
+                          style={{ ...s.btnGhost, padding: "10px 16px", textDecoration: "none", display: "flex", alignItems: "center", gap: 4, whiteSpace: "nowrap", fontWeight: 700 }}>
+                          📍 Ir
+                        </a>
+                      )}
+                    </div>
                   </div>
                   <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
                     <div>
