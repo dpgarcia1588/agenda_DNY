@@ -279,6 +279,15 @@ export default function App() {
     return `${DIAS[(f.getDay() + 6) % 7]} ${d} de ${MESES[m - 1]}`;
   };
 
+  // Mostrar horas en formato 12h (se guardan en 24h para mantener el orden)
+  const fmt12 = (h) => {
+    if (!h) return "";
+    const [H, M] = h.split(":").map(Number);
+    const ap = H >= 12 ? "PM" : "AM";
+    const h12 = H % 12 === 0 ? 12 : H % 12;
+    return `${h12}:${String(M).padStart(2, "0")} ${ap}`;
+  };
+
   const fmtFechaHora = (iso) => {
     if (!iso) return "";
     const f = new Date(iso);
@@ -426,7 +435,7 @@ export default function App() {
                 <div key={ev.id} style={{ fontSize: 12, margin: "6px 0 6px 14px", lineHeight: 1.5 }}>
                   <div><strong>{ev.cliente}</strong>{ev.evento ? ` — ${ev.evento}` : ""} · {ev.tipo} · <strong>{ev.estado}</strong></div>
                   <div>
-                    {ev.hora ? `Hora: ${ev.hora}` : "Hora: por definir"}
+                    {ev.hora ? `Hora: ${fmt12(ev.hora)}` : "Hora: por definir"}
                     {ev.invitados ? ` · Invitados: ${ev.invitados}` : ""}
                     {ev.lugar ? ` · Lugar: ${ev.lugar}` : ""}
                   </div>
@@ -488,7 +497,7 @@ export default function App() {
                         style={{ textAlign: "left", display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10, background: "#FDFBF7", border: `1px solid ${C.line}`, borderLeft: `4px solid ${ev.estado === "Confirmado" ? C.wine : C.gold}`, borderRadius: 10, padding: "10px 14px", cursor: "pointer", fontFamily: "inherit" }}>
                         <div>
                           <strong style={{ fontSize: 15, color: C.ink }}>{ev.cliente}</strong>
-                          <div style={{ fontSize: 13, color: C.wineSoft }}>{ev.evento ? `${ev.evento} · ` : ""}{ev.tipo}{ev.hora ? ` · ${ev.hora}` : ""}{ev.lugar ? ` · ${ev.lugar}` : ""}</div>
+                          <div style={{ fontSize: 13, color: C.wineSoft }}>{ev.evento ? `${ev.evento} · ` : ""}{ev.tipo}{ev.hora ? ` · ${fmt12(ev.hora)}` : ""}{ev.lugar ? ` · ${ev.lugar}` : ""}</div>
                         </div>
                         <div style={{ textAlign: "right", whiteSpace: "nowrap" }}>
                           <div style={{ fontWeight: 700, fontSize: 14, color: C.wine }}>{fmtFecha(fecha)} {fecha.slice(0, 4)}</div>
@@ -650,7 +659,7 @@ export default function App() {
                       <div style={{ display: "grid", gap: 6, marginBottom: 12 }}>
                         {evsDia.map((ev) => (
                           <div key={ev.id} style={{ fontSize: 14, color: C.ink }}>
-                            • <strong>{ev.cliente}</strong> — {ev.evento ? `${ev.evento}, ` : ""}{ev.tipo}{ev.hora ? `, ${ev.hora}` : ""}{ev.lugar ? `, ${ev.lugar}` : ""} <span style={{ color: ev.estado === "Confirmado" ? C.free : C.gold, fontWeight: 700, fontSize: 12 }}>({ev.estado})</span>
+                            • <strong>{ev.cliente}</strong> — {ev.evento ? `${ev.evento}, ` : ""}{ev.tipo}{ev.hora ? `, ${fmt12(ev.hora)}` : ""}{ev.lugar ? `, ${ev.lugar}` : ""} <span style={{ color: ev.estado === "Confirmado" ? C.free : C.gold, fontWeight: 700, fontSize: 12 }}>({ev.estado})</span>
                           </div>
                         ))}
                       </div>
@@ -709,7 +718,7 @@ export default function App() {
                         <button key={ev.id} onClick={() => abrirEditar(ev)} style={{ textAlign: "left", background: "#FDFBF7", border: `1px solid ${C.line}`, borderLeft: `4px solid ${ev.estado === "Confirmado" ? C.wine : C.gold}`, borderRadius: 10, padding: "12px 14px", cursor: "pointer", fontFamily: "inherit" }}>
                           <div style={{ display: "flex", justifyContent: "space-between", gap: 8, flexWrap: "wrap" }}>
                             <strong style={{ fontSize: 15, color: C.ink }}>{ev.cliente}</strong>
-                            <span style={{ fontSize: 13, color: C.muted }}>{ev.hora || "sin hora"}</span>
+                            <span style={{ fontSize: 13, color: C.muted }}>{ev.hora ? fmt12(ev.hora) : "sin hora"}</span>
                           </div>
                           <div style={{ fontSize: 13, color: C.wineSoft, marginTop: 2 }}>{ev.evento ? `${ev.evento} · ` : ""}{ev.tipo}{ev.invitados ? ` · ${ev.invitados} invitados` : ""}</div>
                           {ev.lugar && <div style={{ fontSize: 13, color: C.muted, marginTop: 2 }}>{ev.lugar}</div>}
@@ -771,7 +780,7 @@ export default function App() {
                           {list.map((ev) => (
                             <div key={ev.id} style={{ fontSize: 14, color: C.ink }}>
                               <strong>{ev.cliente}</strong>
-                              <span style={{ color: C.muted }}>{ev.evento ? ` · ${ev.evento}` : ""}{ev.hora ? ` · ${ev.hora}` : ""} · {ev.tipo}</span>
+                              <span style={{ color: C.muted }}>{ev.evento ? ` · ${ev.evento}` : ""}{ev.hora ? ` · ${fmt12(ev.hora)}` : ""} · {ev.tipo}</span>
                               <span style={{ fontSize: 11, fontWeight: 700, textTransform: "uppercase", color: ev.estado === "Confirmado" ? C.free : C.gold }}> {ev.estado}</span>
                             </div>
                           ))}
