@@ -69,6 +69,18 @@ export default function App() {
     setTema(nuevo);
     try { localStorage.setItem("dny-tema", nuevo); } catch {}
   };
+
+  // Pintar la barra del navegador/app del color del tema activo
+  useEffect(() => {
+    let meta = document.querySelector('meta[name="theme-color"]');
+    if (!meta) {
+      meta = document.createElement("meta");
+      meta.name = "theme-color";
+      document.head.appendChild(meta);
+    }
+    meta.setAttribute("content", tema === "oscuro" ? "#0A0A0A" : "#5C1F2E");
+    document.body.style.background = tema === "oscuro" ? "#0A0A0A" : "#F7F3EC";
+  }, [tema]);
   const [vista, setVista] = useState(new Date(hoy.getFullYear(), hoy.getMonth(), 1));
   const [eventos, setEventos] = useState({}); // { "2026-07-04": [evento, ...] }
   const [diaSel, setDiaSel] = useState(keyOf(hoy));
