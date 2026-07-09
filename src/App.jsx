@@ -4,8 +4,8 @@ import { SUPABASE_URL, SUPABASE_ANON_KEY } from "./config.js";
 
 const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-// ————— Paleta "Banquete" —————
-const C = {
+// ————— Paletas: "Banquete" (clara) y "Luxury" (oscura, estilo dnypartydecoration.com) —————
+const PALETA_CLARA = {
   bg: "#F7F3EC",
   card: "#FFFFFF",
   ink: "#2B1B22",
@@ -16,6 +16,37 @@ const C = {
   line: "#E7DFD3",
   free: "#3E7A55",
   muted: "#8C7F72",
+  softGold: C.softGold,
+  cardSoft: C.cardSoft,
+  inputBg: C.inputBg,
+  okBg: C.okBg,
+  okBorder: "#C9E0CE",
+  danger: "#A33",
+  dangerBg: C.dangerBg,
+  dangerBorder: "#E5C5C5",
+  botonTexto: "#FFFFFF",
+};
+
+const PALETA_OSCURA = {
+  bg: "#0B0A09",
+  card: "#161311",
+  ink: "#EFE8DC",
+  wine: "#7E2D40",
+  wineSoft: "#D9A0AC",
+  gold: "#D4A94F",
+  goldSoft: "#5A4A28",
+  line: "#2A2622",
+  free: "#7FC49A",
+  muted: "#A79B8C",
+  softGold: "#2E2618",
+  cardSoft: "#1E1A17",
+  inputBg: "#14110F",
+  okBg: "#14241A",
+  okBorder: "#2E4A38",
+  danger: "#E08A8A",
+  dangerBg: "#2A1515",
+  dangerBorder: "#55302F",
+  botonTexto: "#FFFFFF",
 };
 
 const MESES = ["Enero","Febrero","Marzo","Abril","Mayo","Junio","Julio","Agosto","Septiembre","Octubre","Noviembre","Diciembre"];
@@ -27,6 +58,17 @@ const keyOf = (d) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDat
 
 export default function App() {
   const hoy = new Date();
+
+  // ————— Tema claro / oscuro (se guarda en el dispositivo) —————
+  const [tema, setTema] = useState(() => {
+    try { return localStorage.getItem("dny-tema") || "claro"; } catch { return "claro"; }
+  });
+  const C = tema === "oscuro" ? PALETA_OSCURA : PALETA_CLARA;
+  const alternarTema = () => {
+    const nuevo = tema === "oscuro" ? "claro" : "oscuro";
+    setTema(nuevo);
+    try { localStorage.setItem("dny-tema", nuevo); } catch {}
+  };
   const [vista, setVista] = useState(new Date(hoy.getFullYear(), hoy.getMonth(), 1));
   const [eventos, setEventos] = useState({}); // { "2026-07-04": [evento, ...] }
   const [diaSel, setDiaSel] = useState(keyOf(hoy));
@@ -345,7 +387,7 @@ export default function App() {
 
   // ————— Estilos base —————
   const s = {
-    input: { width: "100%", padding: "10px 12px", border: `1px solid ${C.line}`, borderRadius: 8, fontSize: 15, fontFamily: "inherit", color: C.ink, background: "#FDFCFA", boxSizing: "border-box", outline: "none" },
+    input: { width: "100%", padding: "10px 12px", border: `1px solid ${C.line}`, borderRadius: 8, fontSize: 15, fontFamily: "inherit", color: C.ink, background: C.inputBg, boxSizing: "border-box", outline: "none" },
     label: { fontSize: 12, letterSpacing: "0.06em", textTransform: "uppercase", color: C.muted, marginBottom: 4, display: "block", fontWeight: 600 },
     btnPrim: { background: C.wine, color: "#fff", border: "none", padding: "12px 20px", borderRadius: 8, fontSize: 15, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" },
     btnGhost: { background: "transparent", color: C.wine, border: `1px solid ${C.line}`, padding: "12px 20px", borderRadius: 8, fontSize: 15, cursor: "pointer", fontFamily: "inherit" },
@@ -359,7 +401,7 @@ export default function App() {
       <div style={{ minHeight: "100vh", background: C.bg, fontFamily: "'Karla', sans-serif", color: C.ink, display: "flex", alignItems: "center", justifyContent: "center", padding: 20 }}>
         <div style={{ background: C.card, border: `1px solid ${C.line}`, borderRadius: 14, padding: 28, maxWidth: 520 }}>
           <h1 style={{ fontFamily: "'Fraunces', serif", color: C.wine, fontSize: 26, marginTop: 0 }}>Falta configurar Supabase</h1>
-          <p>Abre el archivo <code style={{ background: "#FBF3E2", padding: "2px 6px", borderRadius: 4 }}>src/config.js</code> y pega tu <strong>Project URL</strong> y tu <strong>anon key</strong> de Supabase (los encuentras en Settings → API de tu proyecto).</p>
+          <p>Abre el archivo <code style={{ background: C.softGold, padding: "2px 6px", borderRadius: 4 }}>src/config.js</code> y pega tu <strong>Project URL</strong> y tu <strong>anon key</strong> de Supabase (los encuentras en Settings → API de tu proyecto).</p>
           <p style={{ color: C.muted, fontSize: 14 }}>Después vuelve a hacer deploy y la app quedará conectada.</p>
         </div>
       </div>
@@ -374,7 +416,11 @@ export default function App() {
   if (!sesion) {
     return (
       <div style={{ minHeight: "100vh", background: C.bg, fontFamily: "'Karla', sans-serif", color: C.ink, display: "flex", alignItems: "center", justifyContent: "center", padding: 20 }}>
-        <div style={{ background: C.card, border: `1px solid ${C.line}`, borderRadius: 16, padding: "32px 28px", maxWidth: 400, width: "100%", boxShadow: "0 4px 20px rgba(92,31,46,0.08)" }}>
+        <div style={{ background: C.card, border: `1px solid ${C.line}`, borderRadius: 16, padding: "32px 28px", maxWidth: 400, width: "100%", boxShadow: "0 4px 20px rgba(0,0,0,0.15)", position: "relative" }}>
+          <button onClick={alternarTema} title="Cambiar tema"
+            style={{ position: "absolute", top: 12, right: 12, background: "transparent", border: `1px solid ${C.line}`, borderRadius: 8, padding: "4px 10px", fontSize: 14, cursor: "pointer" }}>
+            {tema === "oscuro" ? "☀️" : "🌙"}
+          </button>
           <h1 style={{ fontFamily: "'Fraunces', serif", fontSize: 28, margin: 0, fontWeight: 700, color: C.ink, textAlign: "center" }}>
             DNY Party Decoration
           </h1>
@@ -390,7 +436,7 @@ export default function App() {
               <input style={s.input} type="password" value={loginPass} onChange={(e) => setLoginPass(e.target.value)} placeholder="········" autoComplete="current-password"
                 onKeyDown={(e) => { if (e.key === "Enter") iniciarSesion(); }} />
             </div>
-            {loginError && <div style={{ color: "#A33", fontSize: 14, fontWeight: 600 }}>{loginError}</div>}
+            {loginError && <div style={{ color: C.danger, fontSize: 14, fontWeight: 600 }}>{loginError}</div>}
             <button style={{ ...s.btnPrim, opacity: entrando || !loginEmail || !loginPass ? 0.6 : 1 }} onClick={iniciarSesion} disabled={entrando || !loginEmail || !loginPass}>
               {entrando ? "Entrando…" : "Iniciar sesión"}
             </button>
@@ -457,11 +503,17 @@ export default function App() {
             </h1>
             <div style={{ fontFamily: "'Fraunces', serif", fontSize: 18, color: C.wineSoft, marginTop: 6 }}>Agenda de eventos</div>
             {guardando && <div style={{ fontSize: 12, color: C.muted, marginTop: 4 }}>Guardando…</div>}
-            {errorMsg && <div style={{ fontSize: 13, color: "#A33", marginTop: 6, fontWeight: 600 }}>{errorMsg}</div>}
+            {errorMsg && <div style={{ fontSize: 13, color: C.danger, marginTop: 6, fontWeight: 600 }}>{errorMsg}</div>}
           </div>
           <div style={{ textAlign: "right" }}>
             <div style={{ fontSize: 12, color: C.muted, marginBottom: 6 }}>{sesion.user?.email}</div>
-            <button onClick={cerrarSesion} style={{ ...s.btnGhost, padding: "6px 14px", fontSize: 13 }}>Cerrar sesión</button>
+            <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
+              <button onClick={alternarTema} title={tema === "oscuro" ? "Cambiar a tema claro" : "Cambiar a tema oscuro"}
+                style={{ ...s.btnGhost, padding: "6px 12px", fontSize: 15 }}>
+                {tema === "oscuro" ? "☀️" : "🌙"}
+              </button>
+              <button onClick={cerrarSesion} style={{ ...s.btnGhost, padding: "6px 14px", fontSize: 13 }}>Cerrar sesión</button>
+            </div>
           </div>
         </header>
 
@@ -494,7 +546,7 @@ export default function App() {
                   <div style={{ display: "grid", gap: 8 }}>
                     {resultados.map(({ fecha, ev }) => (
                       <button key={ev.id + fecha} onClick={() => abrirResultado(fecha, ev)}
-                        style={{ textAlign: "left", display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10, background: "#FDFBF7", border: `1px solid ${C.line}`, borderLeft: `4px solid ${ev.estado === "Confirmado" ? C.wine : C.gold}`, borderRadius: 10, padding: "10px 14px", cursor: "pointer", fontFamily: "inherit" }}>
+                        style={{ textAlign: "left", display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10, background: C.cardSoft, border: `1px solid ${C.line}`, borderLeft: `4px solid ${ev.estado === "Confirmado" ? C.wine : C.gold}`, borderRadius: 10, padding: "10px 14px", cursor: "pointer", fontFamily: "inherit" }}>
                         <div>
                           <strong style={{ fontSize: 15, color: C.ink }}>{ev.cliente}</strong>
                           <div style={{ fontSize: 13, color: C.wineSoft }}>{ev.evento ? `${ev.evento} · ` : ""}{ev.tipo}{ev.hora ? ` · ${fmt12(ev.hora)}` : ""}{ev.lugar ? ` · ${ev.lugar}` : ""}</div>
@@ -542,7 +594,7 @@ export default function App() {
                       onClick={() => { setDiaSel(k); setForm(null); setConfirmando(false); }}
                       style={{
                         aspectRatio: "1", border: sel ? `2px solid ${C.wine}` : `1px solid ${n ? C.goldSoft : C.line}`,
-                        borderRadius: 10, background: n ? (n >= 2 ? C.wine : "#FBF3E2") : C.card,
+                        borderRadius: 10, background: n ? (n >= 2 ? C.wine : C.softGold) : C.card,
                         color: n >= 2 ? "#fff" : C.ink, cursor: "pointer", position: "relative",
                         fontFamily: "inherit", fontSize: 15, fontWeight: esHoy ? 700 : 500,
                         display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 2,
@@ -562,7 +614,7 @@ export default function App() {
               </div>
 
               <div style={{ display: "flex", gap: 14, marginTop: 12, fontSize: 12, color: C.muted, flexWrap: "wrap" }}>
-                <span><span style={{ display: "inline-block", width: 10, height: 10, borderRadius: 3, background: "#FBF3E2", border: `1px solid ${C.goldSoft}`, marginRight: 5, verticalAlign: "middle" }} />1 evento</span>
+                <span><span style={{ display: "inline-block", width: 10, height: 10, borderRadius: 3, background: C.softGold, border: `1px solid ${C.goldSoft}`, marginRight: 5, verticalAlign: "middle" }} />1 evento</span>
                 <span><span style={{ display: "inline-block", width: 10, height: 10, borderRadius: 3, background: C.wine, marginRight: 5, verticalAlign: "middle" }} />2 o más</span>
               </div>
             </section>
@@ -629,7 +681,7 @@ export default function App() {
                     <textarea style={{ ...s.input, minHeight: 60, resize: "vertical" }} value={form.notas || ""} onChange={(e) => setForm({ ...form, notas: e.target.value })} placeholder="Menú, colores, detalles…" />
                   </div>
                   {form.id && (form.creado_por || form.modificado_por || form.created_at) && (
-                    <div style={{ fontSize: 12, color: C.muted, background: "#FDFBF7", border: `1px solid ${C.line}`, borderRadius: 8, padding: "8px 12px" }}>
+                    <div style={{ fontSize: 12, color: C.muted, background: C.cardSoft, border: `1px solid ${C.line}`, borderRadius: 8, padding: "8px 12px" }}>
                       {(form.creado_por || form.created_at) && <div>Registrado{form.creado_por ? <> por <strong>{form.creado_por}</strong></> : ""}{form.created_at ? ` el ${fmtFechaHora(form.created_at)}` : ""}</div>}
                       {form.modificado_por && <div>Última modificación por <strong>{form.modificado_por}</strong>{form.modificado_en ? ` el ${fmtFechaHora(form.modificado_en)}` : ""}</div>}
                     </div>
@@ -642,7 +694,7 @@ export default function App() {
                     </a>
                   )}
                   {form.id && form.gcal_por && (
-                    <div style={{ background: "#EFF6F0", border: "1px solid #C9E0CE", borderRadius: 8, padding: "10px 12px", fontSize: 13, color: C.ink }}>
+                    <div style={{ background: C.okBg, border: `1px solid ${C.okBorder}`, borderRadius: 8, padding: "10px 12px", fontSize: 13, color: C.ink }}>
                       <div style={{ color: C.free, fontWeight: 700, marginBottom: 4 }}>✓ Agregado a Google Calendar</div>
                       <div style={{ color: C.muted, fontSize: 12 }}>Por {form.gcal_por}{form.gcal_en ? ` el ${fmtFechaHora(form.gcal_en)}` : ""}</div>
                       <div style={{ display: "flex", gap: 12, marginTop: 8 }}>
@@ -652,7 +704,7 @@ export default function App() {
                     </div>
                   )}
                   {confirmando ? (
-                    <div style={{ background: "#FBF3E2", border: `1px solid ${C.goldSoft}`, borderLeft: `4px solid ${C.gold}`, borderRadius: 10, padding: "14px 16px" }}>
+                    <div style={{ background: C.softGold, border: `1px solid ${C.goldSoft}`, borderLeft: `4px solid ${C.gold}`, borderRadius: 10, padding: "14px 16px" }}>
                       <div style={{ fontWeight: 700, color: C.wine, fontSize: 15, marginBottom: 6 }}>
                         ⚠ Este día ya tiene {evsDia.length} {evsDia.length === 1 ? "evento registrado" : "eventos registrados"}
                       </div>
@@ -676,20 +728,20 @@ export default function App() {
                     </button>
                     <button style={s.btnGhost} onClick={() => { setForm(null); setConfirmando(false); }}>Cancelar</button>
                     {form.id && (
-                      <button style={{ ...s.btnGhost, color: "#A33", borderColor: "#E5C5C5", marginLeft: "auto" }} onClick={() => setConfirmandoEliminar(true)}>Eliminar</button>
+                      <button style={{ ...s.btnGhost, color: C.danger, borderColor: C.dangerBorder, marginLeft: "auto" }} onClick={() => setConfirmandoEliminar(true)}>Eliminar</button>
                     )}
                   </div>
                   )}
                   {confirmandoEliminar && form.id && (
-                    <div style={{ background: "#FBEFEF", border: "1px solid #E5C5C5", borderLeft: "4px solid #A33", borderRadius: 10, padding: "14px 16px" }}>
-                      <div style={{ fontWeight: 700, color: "#A33", fontSize: 15, marginBottom: 6 }}>
+                    <div style={{ background: C.dangerBg, border: `1px solid ${C.dangerBorder}`, borderLeft: `4px solid ${C.danger}`, borderRadius: 10, padding: "14px 16px" }}>
+                      <div style={{ fontWeight: 700, color: C.danger, fontSize: 15, marginBottom: 6 }}>
                         ⚠ ¿Eliminar este evento?
                       </div>
                       <div style={{ fontSize: 14, color: C.ink, marginBottom: 12 }}>
                         Se borrará <strong>{form.cliente}</strong>{form.evento ? ` — ${form.evento}` : ""} del {fmtFecha(diaSel)}. Esta acción no se puede deshacer.
                       </div>
                       <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
-                        <button style={{ ...s.btnPrim, background: "#A33" }} onClick={() => { setConfirmandoEliminar(false); eliminarEvento(form.id); }}>Sí, eliminar</button>
+                        <button style={{ ...s.btnPrim, background: C.danger }} onClick={() => { setConfirmandoEliminar(false); eliminarEvento(form.id); }}>Sí, eliminar</button>
                         <button style={s.btnGhost} onClick={() => setConfirmandoEliminar(false)}>No, conservar</button>
                       </div>
                     </div>
@@ -698,7 +750,7 @@ export default function App() {
               ) : (
                 <>
                   {gcalSugerido && gcalSugerido.fecha === diaSel && (
-                    <div style={{ background: "#EFF6F0", border: "1px solid #C9E0CE", borderLeft: `4px solid ${C.free}`, borderRadius: 10, padding: "12px 14px", margin: "14px 0 0" }}>
+                    <div style={{ background: C.okBg, border: `1px solid ${C.okBorder}`, borderLeft: `4px solid ${C.free}`, borderRadius: 10, padding: "12px 14px", margin: "14px 0 0" }}>
                       <div style={{ fontWeight: 700, color: C.free, fontSize: 14, marginBottom: 8 }}>✓ Evento registrado</div>
                       <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
                         <a href={linkGoogleCalendar(gcalSugerido.fecha, gcalSugerido.ev)} target="_blank" rel="noopener noreferrer"
@@ -715,7 +767,7 @@ export default function App() {
                   ) : (
                     <div style={{ display: "grid", gap: 10, margin: "14px 0" }}>
                       {evsDia.map((ev) => (
-                        <button key={ev.id} onClick={() => abrirEditar(ev)} style={{ textAlign: "left", background: "#FDFBF7", border: `1px solid ${C.line}`, borderLeft: `4px solid ${ev.estado === "Confirmado" ? C.wine : C.gold}`, borderRadius: 10, padding: "12px 14px", cursor: "pointer", fontFamily: "inherit" }}>
+                        <button key={ev.id} onClick={() => abrirEditar(ev)} style={{ textAlign: "left", background: C.cardSoft, border: `1px solid ${C.line}`, borderLeft: `4px solid ${ev.estado === "Confirmado" ? C.wine : C.gold}`, borderRadius: 10, padding: "12px 14px", cursor: "pointer", fontFamily: "inherit" }}>
                           <div style={{ display: "flex", justifyContent: "space-between", gap: 8, flexWrap: "wrap" }}>
                             <strong style={{ fontSize: 15, color: C.ink }}>{ev.cliente}</strong>
                             <span style={{ fontSize: 13, color: C.muted }}>{ev.hora ? fmt12(ev.hora) : "sin hora"}</span>
@@ -764,7 +816,7 @@ export default function App() {
                   <button key={k} onClick={() => irADia(k)}
                     style={{
                       display: "flex", gap: 14, alignItems: "flex-start", textAlign: "left",
-                      background: esHoy ? "#FBF3E2" : "transparent",
+                      background: esHoy ? C.softGold : "transparent",
                       border: "none", borderBottom: i < 6 ? `1px solid ${C.line}` : "none",
                       borderRadius: esHoy ? 10 : 0, padding: "10px 8px", cursor: "pointer", fontFamily: "inherit",
                     }}>
