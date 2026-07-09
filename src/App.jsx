@@ -825,7 +825,7 @@ export default function App() {
                 const list = eventos[k] || [];
                 const esHoy = k === keyOf(new Date());
                 return (
-                  <button key={k} onClick={() => irADia(k)}
+                  <button key={k} onClick={() => { irADia(k); const r = document.getElementById("root"); if (r) r.scrollTo({ top: 0, behavior: "smooth" }); window.scrollTo({ top: 0, behavior: "smooth" }); }}
                     style={{
                       display: "flex", gap: 14, alignItems: "flex-start", textAlign: "left",
                       background: esHoy ? C.softGold : "transparent",
