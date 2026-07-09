@@ -28,25 +28,25 @@ const PALETA_CLARA = {
 };
 
 const PALETA_OSCURA = {
-  bg: "#0B0A09",
-  card: "#161311",
-  ink: "#EFE8DC",
-  wine: "#7E2D40",
-  wineSoft: "#D9A0AC",
-  gold: "#D4A94F",
-  goldSoft: "#5A4A28",
-  line: "#2A2622",
-  free: "#7FC49A",
-  muted: "#A79B8C",
-  softGold: "#2E2618",
-  cardSoft: "#1E1A17",
-  inputBg: "#14110F",
-  okBg: "#14241A",
+  bg: "#0A0A0A",          // negro de la web
+  card: "#14120F",         // carbón cálido
+  ink: "#F2EDE3",          // marfil
+  wine: "#D9B876",         // en oscuro el acento principal es el dorado champán (como los botones de la web)
+  wineSoft: "#C9B183",     // dorado suave para subtítulos
+  gold: "#D9B876",         // dorado champán
+  goldSoft: "#4A3D22",     // dorado profundo para bordes
+  line: "#29251F",
+  free: "#8FC7A3",
+  muted: "#A39882",
+  softGold: "#241E12",
+  cardSoft: "#1A1713",
+  inputBg: "#100E0C",
+  okBg: "#142419",
   okBorder: "#2E4A38",
   danger: "#E08A8A",
   dangerBg: "#2A1515",
   dangerBorder: "#55302F",
-  botonTexto: "#FFFFFF",
+  botonTexto: "#14100A",   // texto oscuro sobre botones dorados (como "COTIZA POR WHATSAPP")
 };
 
 const MESES = ["Enero","Febrero","Marzo","Abril","Mayo","Junio","Julio","Agosto","Septiembre","Octubre","Noviembre","Diciembre"];
@@ -389,7 +389,7 @@ export default function App() {
   const s = {
     input: { width: "100%", padding: "10px 12px", border: `1px solid ${C.line}`, borderRadius: 8, fontSize: 15, fontFamily: "inherit", color: C.ink, background: C.inputBg, boxSizing: "border-box", outline: "none" },
     label: { fontSize: 12, letterSpacing: "0.06em", textTransform: "uppercase", color: C.muted, marginBottom: 4, display: "block", fontWeight: 600 },
-    btnPrim: { background: C.wine, color: "#fff", border: "none", padding: "12px 20px", borderRadius: 8, fontSize: 15, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" },
+    btnPrim: { background: C.wine, color: C.botonTexto, border: "none", padding: "12px 20px", borderRadius: 8, fontSize: 15, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" },
     btnGhost: { background: "transparent", color: C.wine, border: `1px solid ${C.line}`, padding: "12px 20px", borderRadius: 8, fontSize: 15, cursor: "pointer", fontFamily: "inherit" },
   };
 
@@ -595,7 +595,7 @@ export default function App() {
                       style={{
                         aspectRatio: "1", border: sel ? `2px solid ${C.wine}` : `1px solid ${n ? C.goldSoft : C.line}`,
                         borderRadius: 10, background: n ? (n >= 2 ? C.wine : C.softGold) : C.card,
-                        color: n >= 2 ? "#fff" : C.ink, cursor: "pointer", position: "relative",
+                        color: n >= 2 ? C.botonTexto : C.ink, cursor: "pointer", position: "relative",
                         fontFamily: "inherit", fontSize: 15, fontWeight: esHoy ? 700 : 500,
                         display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 2,
                       }}
