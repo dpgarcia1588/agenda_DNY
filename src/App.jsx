@@ -310,6 +310,13 @@ export default function App() {
 
   const cambiarMes = (delta) => setVista(new Date(vista.getFullYear(), vista.getMonth() + delta, 1));
 
+  const irAlPanelDia = () => {
+    setTimeout(() => {
+      const p = document.getElementById("panel-dia");
+      if (p) p.scrollIntoView({ behavior: "smooth", block: "start" });
+    }, 50);
+  };
+
   const irADia = (k) => {
     setDiaSel(k);
     setForm(null);
@@ -632,7 +639,7 @@ export default function App() {
             </section>
 
             {/* ————— Panel del día ————— */}
-            <section style={{ background: C.card, borderRadius: 14, border: `1px solid ${C.line}`, padding: 18, marginTop: 24, boxShadow: "0 2px 10px rgba(92,31,46,0.06)" }}>
+            <section id="panel-dia" style={{ background: C.card, borderRadius: 14, border: `1px solid ${C.line}`, padding: 18, marginTop: 24, boxShadow: "0 2px 10px rgba(92,31,46,0.06)", scrollMarginTop: 12 }}>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: 8, flexWrap: "wrap" }}>
                 <h2 style={{ fontFamily: "'Fraunces', serif", fontSize: 20, margin: 0 }}>{fmtFecha(diaSel)}</h2>
                 <span style={{ fontSize: 13, fontWeight: 700, color: ocupacion(evsDia.length).col }}>{ocupacion(evsDia.length).txt}</span>
@@ -825,7 +832,7 @@ export default function App() {
                 const list = eventos[k] || [];
                 const esHoy = k === keyOf(new Date());
                 return (
-                  <button key={k} onClick={() => { irADia(k); const r = document.getElementById("root"); if (r) r.scrollTo({ top: 0, behavior: "smooth" }); window.scrollTo({ top: 0, behavior: "smooth" }); }}
+                  <button key={k} onClick={() => { irADia(k); irAlPanelDia(); }}
                     style={{
                       display: "flex", gap: 14, alignItems: "flex-start", textAlign: "left",
                       background: esHoy ? C.softGold : "transparent",
@@ -865,7 +872,7 @@ export default function App() {
             ) : (
               <div style={{ display: "grid", gap: 8 }}>
                 {proximos.map(([k, list]) => (
-                  <button key={k} onClick={() => { irADia(k); const r = document.getElementById("root"); if (r) r.scrollTo({ top: 0, behavior: "smooth" }); window.scrollTo({ top: 0, behavior: "smooth" }); }}
+                  <button key={k} onClick={() => { irADia(k); irAlPanelDia(); }}
                     style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10, background: "transparent", border: "none", borderBottom: `1px solid ${C.line}`, padding: "10px 2px", cursor: "pointer", fontFamily: "inherit", textAlign: "left" }}>
                     <div>
                       <div style={{ fontWeight: 700, fontSize: 14, color: C.ink }}>{fmtFecha(k)}</div>
